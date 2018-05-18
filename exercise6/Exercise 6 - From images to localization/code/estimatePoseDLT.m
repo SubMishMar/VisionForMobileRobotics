@@ -44,6 +44,10 @@ if det(M(:,1:3)) < 0
     M = -M;
 end
 
+% if M(3, 4) < 0
+%      M = -M;
+% end
+
 R = M(:,1:3);
 
 % Find the closest orthogonal matrix to R

@@ -35,39 +35,94 @@ all_matches = matchDescriptors(query_descriptors, database_descriptors, match_la
 query_matches = flipud(query_keypoints(:, query_indices));
 matched_landmarks = p_W_landmarks(:, match_indices);
 
-% Initialize RANSAC.
-best_inlier_mask = zeros(1, size(query_matches, 2));
-num_iterations = 2000;
-pixel_tolerance = 10;
-k = 6;
 
-max_num_inliers_history = zeros(1, num_iterations);
-max_num_inliers = 0;
-min_inlier_count = 6;
 
-for i = 1:num_iterations
+use_DLT = false;
+
+if use_DLT
+    % Initialize RANSAC.
+    best_inlier_mask = zeros(1, size(query_matches, 2));
+    num_iterations = 2000;
+    pixel_tolerance = 10;
+    k = 6;
+
+    max_num_inliers_history = zeros(1, num_iterations);
+    max_num_inliers = 0;
+    min_inlier_count = 6;    
+    for i = 1:num_iterations
  
-    [landmark_sample, idx] = datasample(matched_landmarks, k, 2, 'Replace', false);
-    keypoint_sample = query_matches(:, idx);
-    [R, t] = estimatePoseDLT(keypoint_sample, landmark_sample, K);
+        [landmark_sample, idx] = datasample(matched_landmarks, k, 2, 'Replace', false);
+        keypoint_sample = query_matches(:, idx);
+        [R, t] = estimatePoseDLT(keypoint_sample, landmark_sample, K);
     
-    M = [R, t];
+        M = [R, t];
     
-    p_reprojected = reprojectPoints(matched_landmarks, M, K);
-    errors = sum((query_matches - p_reprojected).^2, 1);
-    is_inlier = errors < pixel_tolerance^2;
+        p_reprojected = reprojectPoints(matched_landmarks, M, K);
+        errors = sum((query_matches - p_reprojected).^2, 1);
+        is_inlier = errors < pixel_tolerance^2;
     
-    if nnz(is_inlier) > max_num_inliers && ...
-            nnz(is_inlier) >= min_inlier_count
-        max_num_inliers = nnz(is_inlier);        
-        best_inlier_mask = is_inlier;
+        if nnz(is_inlier) > max_num_inliers && ...
+                nnz(is_inlier) >= min_inlier_count
+                max_num_inliers = nnz(is_inlier);        
+                best_inlier_mask = is_inlier;
+        end
+    
+        max_num_inliers_history(i) = max_num_inliers;
+    
     end
-    
-    max_num_inliers_history(i) = max_num_inliers;
-    
-end
 
-[R_C_W, t_C_W] = estimatePoseDLT(query_matches(:, best_inlier_mask>0), matched_landmarks(:, best_inlier_mask>0), K);
+    [R_C_W, t_C_W] = estimatePoseDLT(query_matches(:, best_inlier_mask>0), matched_landmarks(:, best_inlier_mask>0), K);
+else
+    % Initialize RANSAC.
+    best_inlier_mask = zeros(1, size(query_matches, 2));
+    num_iterations = 200;
+    pixel_tolerance = 10;
+    k = 3;
+    
+    max_num_inliers_history = zeros(1, num_iterations);
+    max_num_inliers = 0;
+    min_inlier_count = 6;    
+    
+    for i = 1:num_iterations
+        [landmark_sample, idx] = datasample(matched_landmarks, k, 2, 'Replace', false);
+        keypoint_sample = query_matches(:, idx);
+        normalized_bearings = K\[keypoint_sample; ones(1, 3)];
+        for ii = 1:3
+            normalized_bearings(:,ii) = normalized_bearings(:,ii)/norm(normalized_bearings(:,ii), 2);
+        end
+        poses = p3p(landmark_sample, normalized_bearings);
+        R_C_W = zeros(3, 3, 2);
+        t_C_W = zeros(3, 1, 2);
+        for ii = 0:1
+            R_W_C_ii = real(poses(:, (2+ii*4):(4+ii*4)));
+            t_W_C_ii = real(poses(:, (1+ii*4)));
+            R_C_W(:,:,ii+1) = R_W_C_ii';
+            t_C_W(:,:,ii+1) = -R_W_C_ii'*t_W_C_ii;
+        end
+        
+        M = [R_C_W(:,:,1), t_C_W(:,:,1)];
+        p_reprojected = reprojectPoints(matched_landmarks, M, K);
+        errors = sum((query_matches - p_reprojected).^2, 1);
+        is_inlier = errors < pixel_tolerance^2;        
+        
+        M = [R_C_W(:,:,2), t_C_W(:,:,2)];
+        p_reprojected = reprojectPoints(matched_landmarks, M, K);
+        errors = sum((query_matches - p_reprojected).^2, 1);
+        alternative_is_inlier = errors < pixel_tolerance^2;
+        if nnz(alternative_is_inlier) > nnz(is_inlier)
+            is_inlier = alternative_is_inlier;
+        end
+        if nnz(is_inlier) > max_num_inliers && ...
+                nnz(is_inlier) >= min_inlier_count
+                max_num_inliers = nnz(is_inlier);        
+                best_inlier_mask = is_inlier;
+        end
+    
+        max_num_inliers_history(i) = max_num_inliers;
+    end
+   [R_C_W, t_C_W] = estimatePoseDLT(query_matches(:, best_inlier_mask>0), matched_landmarks(:, best_inlier_mask>0), K);
+
+end
 
 end
 
