@@ -22,44 +22,40 @@ cv::Mat Rw, tw;
 cv::Mat Rij, tij;
 
 
-// void findMatchedPoints(cv::Mat img_1, 
-// 					   cv::Mat img_2,
-// 					   std::vector<cv::Point2f> &corners_1, 
-// 					   std::vector<cv::Point2f> &corners_2){
-// 	 // Default parameters of ORB
-// 	int nfeatures=1000;
-// 	float scaleFactor=1.2f;
-// 	int nlevels=8;
-// 	int edgeThreshold=31; // Changed default (31);
-// 	int firstLevel=0;
-// 	int WTA_K=2;
-// 	int scoreType=cv::ORB::HARRIS_SCORE;
-// 	int patchSize=31;
-//   	int fastThreshold=20;
-
-// 	cv::Size subPixWinSize(10,10), winSize(31,31);
-// 	cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,30,0.01);
-// 	std::vector<cv::KeyPoint> keypoints_1;
-// 	cv::Ptr<cv::FeatureDetector> detector = cv::ORB::create(nfeatures, scaleFactor, nlevels, edgeThreshold,
-//                                   firstLevel, WTA_K, scoreType, patchSize, fastThreshold);
-// 	detector->detect(img_1, keypoints_1);
-// 	for(int i = 0; i < keypoints_1.size(); i++){
-// 		corners_1.push_back(keypoints_1[i].pt);
-// 	}
-// 	cornerSubPix(img_1, corners_1, subPixWinSize, cv::Size(-1,-1), termcrit);
-// 	std::vector<uchar> status;
-// 	std::vector<float> err;
-// 	calcOpticalFlowPyrLK(img_1, img_2, corners_1, corners_2, status, err, winSize, 3, termcrit, 0, 0.001);
-//     size_t i, j;
-//     for( i = 0; i < corners_1.size(); i++ ){
-//       if (!status[i]) continue;
-//       corners_1[j] = corners_1[i];
-//       corners_2[j] = corners_2[i];
-//       j++;
-//     }
-//     corners_1.resize(j);
-//     corners_2.resize(j);
-//}
+double findMatchedPoints(cv::Mat img_1, 
+					   cv::Mat img_2,
+					   std::vector<cv::Point2f> &corners_1, 
+					   std::vector<cv::Point2f> &corners_2){
+	cv::TermCriteria termcrit = cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 
+								30, 0.01);
+    std::vector<cv::KeyPoint> keypoints_1;
+    int fast_threshold = 20;
+    bool nonmaxSuppression = true;
+    cv::Size winSize = cv::Size(10,10);
+    cv::FAST(img_1, keypoints_1, fast_threshold, nonmaxSuppression);
+	cv::KeyPoint::convert(keypoints_1, corners_1, std::vector<int>());
+	cornerSubPix(img_1, corners_1, winSize, cv::Size(-1,-1), termcrit);
+	std::vector<uchar> status;
+	std::vector<float> err;
+	calcOpticalFlowPyrLK(img_1, img_2, corners_1, corners_2, status, err, 
+						cv::Size(2*winSize.width+1, 2*winSize.height+1), 
+						3, termcrit, 0, 0.001);
+    size_t i, j;
+    double diff = 0;
+    for( i = 0; i < corners_1.size(); i++ ){
+      if (!status[i]) continue;
+      corners_1[j] = corners_1[i];
+      corners_2[j] = corners_2[i];
+      diff += sqrt((corners_1[j].x - corners_2[j].x)*(corners_1[j].x - corners_2[j].x)
+      		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));    
+      j++;
+    }
+    diff = diff/j;
+    std::cout << diff << std::endl;
+    corners_1.resize(j);
+    corners_2.resize(j);
+    return diff;
+}
 
 double findTrackedPoints(cv::Mat img_1, 
 					   cv::Mat img_2,
@@ -70,7 +66,7 @@ double findTrackedPoints(cv::Mat img_1,
   	
   	int maxCorners = 1000;
   	double qualityLevel = 0.001;
-  	double minDistance = 10;
+  	double minDistance = 20;
   	int blockSize = 3;
   	bool useHarrisDetector = false;
   	double k = 0.04;	
@@ -89,11 +85,11 @@ double findTrackedPoints(cv::Mat img_1,
       corners_1[j] = corners_1[i];
       corners_2[j] = corners_2[i];
       diff += sqrt((corners_1[j].x - corners_2[j].x)*(corners_1[j].x - corners_2[j].x)
-      		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));
+      		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));    
       j++;
     }
     diff = diff/j;
-    //std::cout << diff << std::endl;
+    std::cout << diff << std::endl;
     corners_1.resize(j);
     corners_2.resize(j);
     return diff;
@@ -146,7 +142,7 @@ int main(int argc, char **argv){
 		cv::cvtColor(image_L_i, image_L_i_out, CV_GRAY2BGR);
 		cv::cvtColor(image_L_j, image_L_j_out, CV_GRAY2BGR);
 
-		double avg_error = findTrackedPoints(image_L_i, image_L_j, corners_i, corners_j);
+		double avg_error = findMatchedPoints(image_L_i, image_L_j, corners_i, corners_j);
 		if(avg_error>=5){
 			undistortPoints(corners_i, corners_i_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
 			undistortPoints(corners_j, corners_j_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
