@@ -32,28 +32,35 @@ double findMatchedPoints(cv::Mat img_1,
     int fast_threshold = 20;
     bool nonmaxSuppression = true;
     cv::Size winSize = cv::Size(10,10);
+
+    std::vector<cv::Point2f> corner1, corner2;
     cv::FAST(img_1, keypoints_1, fast_threshold, nonmaxSuppression);
-	cv::KeyPoint::convert(keypoints_1, corners_1, std::vector<int>());
-	cornerSubPix(img_1, corners_1, winSize, cv::Size(-1,-1), termcrit);
+
+	cv::KeyPoint::convert(keypoints_1, corner1, std::vector<int>());
+
+	cornerSubPix(img_1, corner1, winSize, cv::Size(-1,-1), termcrit);
+
 	std::vector<uchar> status;
 	std::vector<float> err;
-	calcOpticalFlowPyrLK(img_1, img_2, corners_1, corners_2, status, err, 
+	calcOpticalFlowPyrLK(img_1, img_2, corner1, corner2, status, err, 
 						cv::Size(2*winSize.width+1, 2*winSize.height+1), 
 						3, termcrit, 0, 0.001);
-    size_t i, j;
-    double diff = 0;
-    for( i = 0; i < corners_1.size(); i++ ){
-      if (!status[i]) continue;
-      corners_1[j] = corners_1[i];
-      corners_2[j] = corners_2[i];
-      diff += sqrt((corners_1[j].x - corners_2[j].x)*(corners_1[j].x - corners_2[j].x)
-      		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));    
-      j++;
-    }
-    diff = diff/j;
-    std::cout << diff << std::endl;
-    corners_1.resize(j);
-    corners_2.resize(j);
+
+
+	double diff = 0;
+	int j = 0;
+	for(int i = 0; i < status.size(); i++){
+		if(status[i] == 0 || 
+		   corner2[i].x < 0 || corner2[i].y < 0 || 
+		   corner2[i].x > img_1.cols || corner2[i].y > img_1.rows) continue;
+        diff += sqrt((corner1[i].x - corner2[i].x)*(corner1[i].x - corner2[i].x)
+      		      + (corner1[i].y - corner2[i].y)*(corner1[i].y - corner2[i].y));   
+		corners_1.push_back(corner1[i]);
+		corners_2.push_back(corner2[i]);
+		j++;
+	}
+	diff/=j;
+	std::cout << diff << std::endl;
     return diff;
 }
 
@@ -88,7 +95,7 @@ double findTrackedPoints(cv::Mat img_1,
       		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));    
       j++;
     }
-    diff = diff/j;
+    diff /= j;
     std::cout << diff << std::endl;
     corners_1.resize(j);
     corners_2.resize(j);
@@ -133,6 +140,7 @@ int main(int argc, char **argv){
 	for(int i = 0; i < 2000/*filenames_left.size()-1*/; i++){
 		image_L_i = imread(filenames_left[i], CV_8UC1);
 		image_L_j = imread(filenames_left[i+1], CV_8UC1);
+
 		undistort(image_L_i, image_L_i_ud, K, cv::noArray(), K);
 		undistort(image_L_j, image_L_j_ud, K, cv::noArray(), K);
 
@@ -143,6 +151,7 @@ int main(int argc, char **argv){
 		cv::cvtColor(image_L_j, image_L_j_out, CV_GRAY2BGR);
 
 		double avg_error = findMatchedPoints(image_L_i, image_L_j, corners_i, corners_j);
+
 		if(avg_error>=5){
 			undistortPoints(corners_i, corners_i_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
 			undistortPoints(corners_j, corners_j_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
