@@ -45,8 +45,6 @@ double findMatchedPoints(cv::Mat img_1,
 	calcOpticalFlowPyrLK(img_1, img_2, corner1, corner2, status, err, 
 						cv::Size(2*winSize.width+1, 2*winSize.height+1), 
 						3, termcrit, 0, 0.001);
-
-
 	double diff = 0;
 	int j = 0;
 	for(int i = 0; i < status.size(); i++){
