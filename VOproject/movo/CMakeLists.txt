@@ -1,0 +1,6 @@
+cmake_minimum_required( VERSION 2.8 )
+project( movo )
+find_package(OpenCV REQUIRED)
+find_package(Eigen3  REQUIRED)
+add_executable( movo src/movo.cpp )
+target_link_libraries(movo ${OpenCV_LIBS} )
