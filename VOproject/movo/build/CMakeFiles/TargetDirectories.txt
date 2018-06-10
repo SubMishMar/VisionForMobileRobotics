@@ -1,3 +1,0 @@
-/media/perceptin/Elements/PhD/projects/movo/build/CMakeFiles/edit_cache.dir
-/media/perceptin/Elements/PhD/projects/movo/build/CMakeFiles/rebuild_cache.dir
-/media/perceptin/Elements/PhD/projects/movo/build/CMakeFiles/movo.dir
