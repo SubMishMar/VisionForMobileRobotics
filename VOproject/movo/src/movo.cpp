@@ -10,6 +10,12 @@
 #include <opencv2/core/eigen.hpp>
 
 
+#include <pcl/common/common_headers.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/visualization/pcl_visualizer.h>
+
 // Global Variables
 cv::Mat P_L;
 cv::Mat image_L_i, image_L_i_ud;
@@ -21,7 +27,7 @@ cv::Mat essMat;
 cv::Mat Rw, tw;
 cv::Mat Rij, tij;
 
-
+cv::Mat K = cv::Mat::zeros(3, 3, CV_64F);
 double findMatchedPoints(cv::Mat img_1, 
 					   cv::Mat img_2,
 					   std::vector<cv::Point2f> &corners_1, 
@@ -100,6 +106,114 @@ double findTrackedPoints(cv::Mat img_1,
     return diff;
 }
 
+void initialize(cv::Mat img_1, cv::Mat img_2){
+	cv::Mat img_1_ud, img_2_ud;
+	undistort(img_1, img_1_ud, K, cv::noArray(), K);
+	undistort(img_2, img_2_ud, K, cv::noArray(), K);
+	std::vector<cv::Point2f> corners_1, corners_1_ud;
+	std::vector<cv::Point2f> corners_2, corners_2_ud;
+	std::vector<cv::Point2d> inlier_corners_1, inlier_corners_2;
+	findMatchedPoints(img_1_ud, img_2_ud, corners_1, corners_2);
+	undistortPoints(corners_1, corners_1_ud, K, 
+					cv::noArray(), cv::noArray(), cv::noArray());
+	undistortPoints(corners_2, corners_2_ud, K, 
+					cv::noArray(), cv::noArray(), cv::noArray());
+	cv::Mat mask;
+	essMat = findEssentialMat(corners_1_ud, corners_2_ud, 1.0, cv::Point2d(0.0, 0.0), 
+							  cv::RANSAC, 0.99, 
+							  10.0/(K.at<double>(0, 0)+K.at<double>(1, 1)), mask);
+	recoverPose(essMat, corners_1_ud, corners_2_ud, Rij, tij, 1.0, cv::Point2d(0.0, 0.0), mask);
+	int j = 0;
+	std::cout << corners_2_ud.size() << std::endl;
+	for(int i = 0; i < corners_1.size(); i++){
+		if(!mask.at<short>(i,0)) continue;
+		corners_1[j] = corners_1[i];
+		corners_2[j] = corners_2[i];
+		corners_1_ud[j] = corners_1_ud[i];
+		corners_2_ud[j] = corners_2_ud[i];
+		inlier_corners_1.push_back
+		(cv::Point2d((double)corners_1_ud[j].x,(double)corners_1_ud[j].y));
+		inlier_corners_2.push_back
+		(cv::Point2d((double)corners_2_ud[j].x,(double)corners_2_ud[j].y));
+		j++;
+	}
+
+	corners_1.resize(j);
+	corners_2.resize(j);
+	corners_1_ud.resize(j);
+	corners_2_ud.resize(j);
+	std::cout << corners_2_ud.size() << std::endl;
+	// cv::Mat src;
+	// cv::hconcat(img_1, img_2, src);
+	// for(int i = 0; i < corners_1.size(); i++){
+ //      	cv::line( src, corners_1[i],
+ //                cv::Point2f((float)corners_2[i].x + (float)img_1_ud.cols,
+ //                            (float)corners_2[i].y), 1, 1, 0 );
+	// }
+	// imshow("matchedpoints", src);
+	// cv::waitKey(0);
+
+  	cv::Mat Rt0 = cv::Mat::eye(3, 4, CV_64FC1);
+  	cv::Mat Rt1 = cv::Mat::eye(3, 4, CV_64FC1);
+  	Rij.copyTo(Rt1.rowRange(0,3).colRange(0,3));
+	tij.copyTo(Rt1.rowRange(0,3).col(3));
+
+	cv::Mat point3d_homo;
+	cv::triangulatePoints(
+		Rt0, Rt1, 
+		inlier_corners_1, inlier_corners_2,
+		point3d_homo);
+	pcl::visualization::PCLVisualizer viewer("viewer");
+	viewer.setBackgroundColor(255, 255, 255);
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+	cloud->points.resize (point3d_homo.cols);
+	for(int i = 0; i < point3d_homo.cols; i++) {
+    	pcl::PointXYZRGB &point = cloud->points[i];
+	    cv::Mat p3d;
+	    cv::Mat _p3h = point3d_homo.col(i);
+	    convertPointsFromHomogeneous(_p3h.t(), p3d);
+	    point.x = p3d.at<double>(0);
+	    point.y = p3d.at<double>(1);
+	    point.z = p3d.at<double>(2);
+	    point.r = 0;
+	    point.g = 0;
+	    point.b = 255;
+	}
+	viewer.addPointCloud(cloud, "Triangulated Point Cloud");
+  	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
+                                            3, "Triangulated Point Cloud");
+  	viewer.addCoordinateSystem (1.0);
+
+  	  // add the second camera pose 
+  Eigen::Matrix4f eig_mat;
+  Eigen::Affine3f cam_pose;
+
+  Rij.convertTo(Rij, CV_32F);
+  tij.convertTo(tij, CV_32F);
+
+  //this shows how a camera moves
+  cv::Mat Rinv = Rij.t(); 
+  cv::Mat T = -Rinv * tij;
+
+  eig_mat(0,0) = Rinv.at<float>(0,0);eig_mat(0,1) = Rinv.at<float>(0,1);eig_mat(0,2) = Rinv.at<float>(0,2);
+  eig_mat(1,0) = Rinv.at<float>(1,0);eig_mat(1,1) = Rinv.at<float>(1,1);eig_mat(1,2) = Rinv.at<float>(1,2);
+  eig_mat(2,0) = Rinv.at<float>(2,0);eig_mat(2,1) = Rinv.at<float>(2,1);eig_mat(2,2) = Rinv.at<float>(2,2);
+  eig_mat(3,0) = 0.f; eig_mat(3,1) = 0.f; eig_mat(3,2) = 0.f;
+  eig_mat(0, 3) = T.at<float>(0);
+  eig_mat(1, 3) = T.at<float>(1);
+  eig_mat(2, 3) = T.at<float>(2);
+  eig_mat(3, 3) = 1.f;
+
+  cam_pose = eig_mat;
+
+  //cam_pose should be Affine3f, Affine3d cannot be used
+  viewer.addCoordinateSystem(1.0, cam_pose, "2nd cam");
+
+  viewer.initCameraParameters ();
+  while (!viewer.wasStopped ()) {
+    viewer.spin();
+}
+}
 int main(int argc, char **argv){
 	std::vector<cv::String> filenames_left;
 	cv::String folder_left = argv[1];
@@ -117,7 +231,7 @@ int main(int argc, char **argv){
 	c_y = P_L.at<double>(1, 2);
 	f = P_L.at<double>(0, 0);
 
-	cv::Mat K = cv::Mat::zeros(3, 3, CV_64F);
+	
 	K.at<double>(0, 0) = f;
 	K.at<double>(0, 2) = c_x;
 	K.at<double>(1, 1) = f;
@@ -133,9 +247,12 @@ int main(int argc, char **argv){
 
 	Rw = cv::Mat::eye(3, 3, CV_64F);
 	tw = cv::Mat::zeros(3, 1, CV_64F);
-
+	cv::Mat img_1 = imread(filenames_left[0], CV_8UC1);
+	cv::Mat img_2 = imread(filenames_left[2], CV_8UC1);
+	initialize(img_1, img_2);
+	return 0;
 	int x = 0, y = 0;	
-	for(int i = 0; i < 2000/*filenames_left.size()-1*/; i++){
+	for(int i = 4; i < 2000/*filenames_left.size()-1*/; i++){
 		image_L_i = imread(filenames_left[i], CV_8UC1);
 		image_L_j = imread(filenames_left[i+1], CV_8UC1);
 
@@ -148,7 +265,7 @@ int main(int argc, char **argv){
 		cv::cvtColor(image_L_i, image_L_i_out, CV_GRAY2BGR);
 		cv::cvtColor(image_L_j, image_L_j_out, CV_GRAY2BGR);
 
-		double avg_error = findMatchedPoints(image_L_i, image_L_j, corners_i, corners_j);
+		double avg_error = findMatchedPoints(image_L_i_ud, image_L_j_ud, corners_i, corners_j);
 
 		if(avg_error>=5){
 			undistortPoints(corners_i, corners_i_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
@@ -157,7 +274,7 @@ int main(int argc, char **argv){
 			cv::Mat mask;
 			essMat = findEssentialMat(corners_j_ud, corners_i_ud, 1.0, cv::Point2d(0.0, 0.0), cv::RANSAC,
 									 0.99, 10.0/(P_L.at<double>(0, 0)+P_L.at<double>(1, 1)), mask);
-			recoverPose(essMat, corners_j_ud, corners_i_ud, Rij, tij, 1.0, cv::Point2d(0.0, 0.0), mask);
+			recoverPose(essMat, corners_j_ud, corners_i_ud, Rij, tij, 1.0, cv::Point2d(0.0, 0.0), mask);		
 		}
 		else {
 			tij = cv::Mat::zeros(3, 1, CV_64F);
