@@ -13,14 +13,16 @@
 #include <opencv2/core/eigen.hpp>
 
 
-#include <pcl/common/common_headers.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/visualization/pcl_visualizer.h>
+// #include <pcl/common/common_headers.h>
+// #include <pcl/io/pcd_io.h>
+// #include <pcl/point_types.h>
+// #include <pcl/point_cloud.h>
+// #include <pcl/visualization/pcl_visualizer.h>
 
 #include "movo.h"
-
+movo::movo(int argc, char **argv){
+	readParams(argc, argv);
+}
 void movo::readParams(int argc, char **argv) {
 	std::vector<cv::String> filenames_left;
 	cv::String folder_left = argv[1];
@@ -31,20 +33,25 @@ void movo::readParams(int argc, char **argv) {
 	if(!fsSettings.isOpened()){
 		std::cerr<<("Failed to open")<<std::endl;
 	}
+	else {
+		fsSettings["P0"] >> P_L;
 
-	fsSettings["P0"] >> P_L;
+		fsSettings["maxCorners"] >> maxCorners;
+		fsSettings["qualityLevel"] >> qualityLevel;
+		fsSettings["minDistance"] >> minDistance;
+		fsSettings["blockSize"] >> blockSize;
+		fsSettings["useHarrisDetector"] >> useHarrisDetector;
+		fsSettings["k"] >> k;
+		fsSettings["winSizeGFTT"] >> winSizeGFTT;
 
-	fsSettings["maxCorners"] >> maxCorners;
-	fsSettings["qualityLevel"] >> qualityLevel;
-	fsSettings["minDistance"] >> minDistance;
-	fsSettings["blockSize"] >> blockSize;
-	fsSettings["useHarrisDetector"] >> useHarrisDetector;
-	fsSettings["k"] >> k;
-	fsSettings["winSizeGFTT"] >> winSizeGFTT;
+		fsSettings["fast_threshold"] >> fast_threshold;
+		fsSettings["nonmaxSuppression"] >> nonmaxSuppression;
+		fsSettings["winSizeFAST"] >> winSizeFAST;
 
-	fsSettings["fast_threshold"] >> fast_threshold;
-	fsSettings["nonmaxSuppression"] >> nonmaxSuppression;
-	fsSettings["winSizeFAST"] >> winSizeFAST;
+		std::cout << "Parameters Loaded Successfully" << std::endl << std::endl;
+	}
+
+
 }
 
 void movo::detectGoodFeatures(cv::Mat img, 
@@ -95,8 +102,9 @@ cv::Mat movo::poseEstimation(std::vector<cv::Point2f> corners1,
 	recoverPose(essMat, corners2, corners1, R, t, 1.0, cv::Point2d(0.0, 0.0), mask);
 	return mask;
 }
+
 int main(int argc, char **argv) {
-	movo vo;
-	vo.readParams(argc, argv);
+	movo vo(argc, argv);
+
 	return 0;
 }

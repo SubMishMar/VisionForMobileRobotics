@@ -1,4 +1,4 @@
-# Install script for directory: /home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo
+# Install script for directory: /home/perceptin/github-projects/VisionForMobileRobotics/VOproject/movo
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/perceptin/github-projects/VisionForMobileRobotics/VOproject/movo/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

@@ -18,8 +18,8 @@ private:
     int winSizeFAST;
 
 public:
-	movo();
-	~movo();
+	//construtor
+	movo(int, char**);
 	//reads Params related to all functionalities
 	void readParams(int, char**);
 	// detects gftt
