@@ -7,24 +7,24 @@
 #IncludeRegexTransform: 
 
 /home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/movo.cpp
-iostream
+cmath
 -
 string
 -
-cmath
+iostream
 -
 eigen3/Eigen/Eigen
 -
 opencv2/core.hpp
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/opencv2/core.hpp
+-
 opencv2/highgui/highgui.hpp
 -
 opencv2/features2d/features2d.hpp
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/opencv2/features2d/features2d.hpp
+-
 opencv2/video/tracking.hpp
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/opencv2/video/tracking.hpp
+-
 opencv2/calib3d/calib3d.hpp
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/opencv2/calib3d/calib3d.hpp
+-
 opencv2/core/eigen.hpp
 -
 pcl/common/common_headers.h
@@ -37,6 +37,10 @@ pcl/point_cloud.h
 -
 pcl/visualization/pcl_visualizer.h
 -
+movo.h
+/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/movo.h
+
+/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/movo.h
 
 /usr/include/eigen3/Eigen/Cholesky
 Core

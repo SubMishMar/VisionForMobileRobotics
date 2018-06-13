@@ -3,6 +3,7 @@
 
 CMakeFiles/movo.dir/src/movo.cpp.o
  /home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/movo.cpp
+ /home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/src/movo.h
  /usr/include/eigen3/Eigen/Cholesky
  /usr/include/eigen3/Eigen/Core
  /usr/include/eigen3/Eigen/Dense
