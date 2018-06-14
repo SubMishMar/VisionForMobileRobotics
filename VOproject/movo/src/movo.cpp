@@ -1,20 +1,5 @@
-#include <eigen3/Eigen/Eigen>
-
-#include <opencv2/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/video/tracking.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/core/eigen.hpp>
-
-
-#include <pcl/common/common_headers.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/visualization/pcl_visualizer.h>
-
 #include "movo.h"
+
 movo::movo(int argc, char **argv){
 	readParams(argc, argv);
 	K = P_L(cv::Range(0,3), cv::Range(0, 3));
