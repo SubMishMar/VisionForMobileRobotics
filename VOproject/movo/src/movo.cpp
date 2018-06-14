@@ -1,8 +1,3 @@
-
-#include <cmath>
-#include <string>
-#include <iostream>
-
 #include <eigen3/Eigen/Eigen>
 
 #include <opencv2/core.hpp>
@@ -13,22 +8,21 @@
 #include <opencv2/core/eigen.hpp>
 
 
-// #include <pcl/common/common_headers.h>
-// #include <pcl/io/pcd_io.h>
-// #include <pcl/point_types.h>
-// #include <pcl/point_cloud.h>
-// #include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/common/common_headers.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 #include "movo.h"
 movo::movo(int argc, char **argv){
 	readParams(argc, argv);
+	K = P_L(cv::Range(0,3), cv::Range(0, 3));
 }
 void movo::readParams(int argc, char **argv) {
-	std::vector<cv::String> filenames_left;
-	cv::String folder_left = argv[1];
+	folder_left = argv[1];
 	cv::glob(folder_left, filenames_left);
-
-	std::string config_file = argv[2];
+    config_file = argv[2];
 	cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
 	if(!fsSettings.isOpened()){
 		std::cerr<<("Failed to open")<<std::endl;
@@ -48,10 +42,9 @@ void movo::readParams(int argc, char **argv) {
 		fsSettings["nonmaxSuppression"] >> nonmaxSuppression;
 		fsSettings["winSizeFAST"] >> winSizeFAST;
 
+		fsSettings["useFAST"] >> useFAST;
 		std::cout << "Parameters Loaded Successfully" << std::endl << std::endl;
 	}
-
-
 }
 
 void movo::detectGoodFeatures(cv::Mat img, 
@@ -92,19 +85,85 @@ cv::Mat movo::poseEstimation(std::vector<cv::Point2f> corners1,
 					         std::vector<cv::Point2f> corners2,
 					         cv::Mat &R, cv::Mat &t) {
 	std::vector<cv::Point2f> corners1_ud, corners2_ud;
-	cv::Mat K = P_L(cv::Range(0,2), cv::Range(0, 2));
 	undistortPoints(corners1, corners1_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
 	undistortPoints(corners2, corners2_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
 	cv::Mat mask;
-	cv::Mat essMat = findEssentialMat(corners2_ud, corners1_ud, 1.0, cv::Point2d(0.0, 0.0), 
+	cv::Mat essMat = findEssentialMat(corners1_ud, corners2_ud, 1.0, cv::Point2d(0.0, 0.0), 
 							  cv::RANSAC, 0.99, 
-							  10.0/(P_L.at<double>(0, 0)+P_L.at<double>(1, 1)), mask);
-	recoverPose(essMat, corners2, corners1, R, t, 1.0, cv::Point2d(0.0, 0.0), mask);
+							  10.0/(K.at<double>(0, 0)+K.at<double>(1, 1)), mask);
+	recoverPose(essMat, corners1_ud, corners2_ud, R, t, 1.0, cv::Point2d(0.0, 0.0), mask);
 	return mask;
 }
 
-int main(int argc, char **argv) {
-	movo vo(argc, argv);
-
-	return 0;
+void movo::filterbyMask(cv::Mat mask,
+					    std::vector<cv::Point2f> &corners1,
+					    std::vector<cv::Point2f> &corners2) {
+	int j = 0;
+	mask.convertTo(mask, CV_64F);
+	for(int i = 0; i < corners1.size(); i++) {
+		if(mask.at<double>(i, 0)==0) {
+			continue;
+		}
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+	std::cout << corners1.size() << std::endl;
 }
+
+void movo::filterbyStatus(std::vector<uchar> status,
+					      std::vector<cv::Point2f> &corners1,
+					      std::vector<cv::Point2f> &corners2) {
+	int j = 0;
+	for(int i = 0; i < status.size(); i++) {
+		if(status[i] == 0 ||
+		   corners2[i].x < 0 || corners2[i].y < 0 ||
+		   corners2[i].x > img1.cols || corners2[i].y > img1.rows) continue;
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+}
+
+void movo::initialize(uint frame1, uint frame2) {
+	img1 = imread(filenames_left[frame1], CV_8UC1);
+	undistort(img1, img1_ud, K, cv::noArray(), K);
+	img2 = imread(filenames_left[frame2], CV_8UC1);
+	undistort(img2, img2_ud, K, cv::noArray(), K);
+
+	std::vector<cv::Point2f> corners1, corners2;
+	std::vector<cv::Point2f> corners1_ud, corners2_ud;
+	std::vector<uchar> status;
+	if(true) {
+		detectFASTFeatures(img1_ud, corners1);
+	} else {
+		detectGoodFeatures(img1_ud, corners1);
+	}
+	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
+	filterbyStatus(status, corners1, corners2);
+	mask = poseEstimation(corners2, corners1, R, t);
+    std::cout << mask.size() << std::endl;
+	filterbyMask(mask, corners1, corners2);
+	drawmatches(img1_ud, img2_ud, corners1, corners2);
+}
+
+void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
+				   	   std::vector<cv::Point2f> corners1,
+					   std::vector<cv::Point2f> corners2) {
+	
+	cv::cvtColor(img1, img1_out, CV_GRAY2BGR);
+	cv::cvtColor(img2, img2_out, CV_GRAY2BGR);
+	for(int l = 0; l < corners1.size(); l++){
+		cv::circle(img1_out, corners1[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
+		cv::circle(img2_out, corners2[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
+	}	
+	imshow("img1", img1_out);
+	cv::waitKey(0);
+	imshow("img2", img2_out);
+	cv::waitKey(0);
+}
+
