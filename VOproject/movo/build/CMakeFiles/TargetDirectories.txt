@@ -1,3 +1,0 @@
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/build/CMakeFiles/edit_cache.dir
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/build/CMakeFiles/rebuild_cache.dir
-/home/subodh/github-projects/VisionForMobileRobotics/VOproject/movo/build/CMakeFiles/movo.dir

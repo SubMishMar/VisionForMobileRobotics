@@ -1,201 +1,154 @@
-#include <iostream>
-#include <string>
-#include <cmath>
-#include <eigen3/Eigen/Eigen>
-#include "opencv2/core.hpp"
-#include <opencv2/highgui/highgui.hpp>
-#include "opencv2/features2d/features2d.hpp"
-#include "opencv2/video/tracking.hpp"
-#include "opencv2/calib3d/calib3d.hpp"
-#include <opencv2/core/eigen.hpp>
+#include "movo.h"
 
-
-// Global Variables
-cv::Mat P_L;
-cv::Mat image_L_i, image_L_i_ud;
-cv::Mat image_L_j, image_L_j_ud;
-cv::Mat image_L_i_out, image_L_j_out;
-double c_x, c_y, f, T_x;
-cv::Mat essMat;
-
-cv::Mat Rw, tw;
-cv::Mat Rij, tij;
-
-
-double findMatchedPoints(cv::Mat img_1, 
-					   cv::Mat img_2,
-					   std::vector<cv::Point2f> &corners_1, 
-					   std::vector<cv::Point2f> &corners_2){
-	cv::TermCriteria termcrit = cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 
-								30, 0.01);
-    std::vector<cv::KeyPoint> keypoints_1;
-    int fast_threshold = 20;
-    bool nonmaxSuppression = true;
-    cv::Size winSize = cv::Size(10,10);
-
-    std::vector<cv::Point2f> corner1, corner2;
-    cv::FAST(img_1, keypoints_1, fast_threshold, nonmaxSuppression);
-
-	cv::KeyPoint::convert(keypoints_1, corner1, std::vector<int>());
-
-	cornerSubPix(img_1, corner1, winSize, cv::Size(-1,-1), termcrit);
-
-	std::vector<uchar> status;
-	std::vector<float> err;
-	calcOpticalFlowPyrLK(img_1, img_2, corner1, corner2, status, err, 
-						cv::Size(2*winSize.width+1, 2*winSize.height+1), 
-						3, termcrit, 0, 0.001);
-	double diff = 0;
-	int j = 0;
-	for(int i = 0; i < status.size(); i++){
-		if(status[i] == 0 || 
-		   corner2[i].x < 0 || corner2[i].y < 0 || 
-		   corner2[i].x > img_1.cols || corner2[i].y > img_1.rows) continue;
-        diff += sqrt((corner1[i].x - corner2[i].x)*(corner1[i].x - corner2[i].x)
-      		      + (corner1[i].y - corner2[i].y)*(corner1[i].y - corner2[i].y));   
-		corners_1.push_back(corner1[i]);
-		corners_2.push_back(corner2[i]);
-		j++;
-	}
-	diff/=j;
-	std::cout << diff << std::endl;
-    return diff;
+movo::movo(int argc, char **argv){
+	readParams(argc, argv);
+	K = P_L(cv::Range(0,3), cv::Range(0, 3));
 }
-
-double findTrackedPoints(cv::Mat img_1, 
-					   cv::Mat img_2,
-					   std::vector<cv::Point2f> &corners_1, 
-					   std::vector<cv::Point2f> &corners_2){
-	std::vector<float> err;
-	std::vector<uchar> status;
-  	
-  	int maxCorners = 1000;
-  	double qualityLevel = 0.001;
-  	double minDistance = 20;
-  	int blockSize = 3;
-  	bool useHarrisDetector = false;
-  	double k = 0.04;	
-
-  	cv::Size winSize = cv::Size(10,10);
-  	cv::TermCriteria termcrit = cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
-  	goodFeaturesToTrack( img_1, corners_1, maxCorners, qualityLevel, minDistance, cv::Mat(), 
-  		blockSize, useHarrisDetector, k );
-  	cornerSubPix( img_1, corners_1, winSize, cv::Size(-1,-1), termcrit);
-  	calcOpticalFlowPyrLK( img_1, img_2, corners_1, corners_2, 
-  		status, err, cv::Size(2*winSize.width+1, 2*winSize.height+1), 3, termcrit, 1, 0.001);
-    size_t i, j;
-    double diff = 0;
-    for( i = j = 0; i < corners_1.size(); i++ ){
-      if (!status[i]) continue;
-      corners_1[j] = corners_1[i];
-      corners_2[j] = corners_2[i];
-      diff += sqrt((corners_1[j].x - corners_2[j].x)*(corners_1[j].x - corners_2[j].x)
-      		+ (corners_1[j].y - corners_2[j].y)*(corners_1[j].y - corners_2[j].y));    
-      j++;
-    }
-    diff /= j;
-    std::cout << diff << std::endl;
-    corners_1.resize(j);
-    corners_2.resize(j);
-    return diff;
-}
-
-int main(int argc, char **argv){
-	std::vector<cv::String> filenames_left;
-	cv::String folder_left = argv[1];
+void movo::readParams(int argc, char **argv) {
+	folder_left = argv[1];
 	cv::glob(folder_left, filenames_left);
-
-	std::string config_file = argv[2];
+    config_file = argv[2];
 	cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
 	if(!fsSettings.isOpened()){
 		std::cerr<<("Failed to open")<<std::endl;
 	}
-	
-	fsSettings["P0"] >> P_L;
+	else {
+		fsSettings["P0"] >> P_L;
 
-	c_x = P_L.at<double>(0, 2);
-	c_y = P_L.at<double>(1, 2);
-	f = P_L.at<double>(0, 0);
+		fsSettings["maxCorners"] >> maxCorners;
+		fsSettings["qualityLevel"] >> qualityLevel;
+		fsSettings["minDistance"] >> minDistance;
+		fsSettings["blockSize"] >> blockSize;
+		fsSettings["useHarrisDetector"] >> useHarrisDetector;
+		fsSettings["k"] >> k;
+		fsSettings["winSizeGFTT"] >> winSizeGFTT;
 
-	cv::Mat K = cv::Mat::zeros(3, 3, CV_64F);
-	K.at<double>(0, 0) = f;
-	K.at<double>(0, 2) = c_x;
-	K.at<double>(1, 1) = f;
-	K.at<double>(1, 2) = c_y;
-	K.at<double>(2, 2) = 1.0;
-    
-	cv::Scalar color= cv::Scalar( 0, 0, 255);
+		fsSettings["fast_threshold"] >> fast_threshold;
+		fsSettings["nonmaxSuppression"] >> nonmaxSuppression;
+		fsSettings["winSizeFAST"] >> winSizeFAST;
 
-	cv::namedWindow("features_i");
-	cv::namedWindow("features_j");
-	cv::namedWindow("Trajectory");
-	cv::Mat traj =  cv::Mat::zeros(1500, 1500, CV_8UC3);
-
-	Rw = cv::Mat::eye(3, 3, CV_64F);
-	tw = cv::Mat::zeros(3, 1, CV_64F);
-
-	int x = 0, y = 0;	
-	for(int i = 0; i < 2000/*filenames_left.size()-1*/; i++){
-		image_L_i = imread(filenames_left[i], CV_8UC1);
-		image_L_j = imread(filenames_left[i+1], CV_8UC1);
-
-		undistort(image_L_i, image_L_i_ud, K, cv::noArray(), K);
-		undistort(image_L_j, image_L_j_ud, K, cv::noArray(), K);
-
-		std::vector<cv::Point2f> corners_i, corners_i_ud;
-		std::vector<cv::Point2f> corners_j, corners_j_ud;
-		
-		cv::cvtColor(image_L_i, image_L_i_out, CV_GRAY2BGR);
-		cv::cvtColor(image_L_j, image_L_j_out, CV_GRAY2BGR);
-
-		double avg_error = findMatchedPoints(image_L_i, image_L_j, corners_i, corners_j);
-
-		if(avg_error>=5){
-			undistortPoints(corners_i, corners_i_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
-			undistortPoints(corners_j, corners_j_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
-
-			cv::Mat mask;
-			essMat = findEssentialMat(corners_j_ud, corners_i_ud, 1.0, cv::Point2d(0.0, 0.0), cv::RANSAC,
-									 0.99, 10.0/(P_L.at<double>(0, 0)+P_L.at<double>(1, 1)), mask);
-			recoverPose(essMat, corners_j_ud, corners_i_ud, Rij, tij, 1.0, cv::Point2d(0.0, 0.0), mask);
-		}
-		else {
-			tij = cv::Mat::zeros(3, 1, CV_64F);
-			Rij = cv::Mat::eye(3, 3, CV_64F);
-		}
-
-		tw = Rw*tij + tw;
-		Rw = Rw*Rij;
-
-		x = int(tw.at<double>(0)) + 750;
-		y = int(tw.at<double>(2)) + 750;	
-
-		cv::circle(traj, cv::Point(y, x), 1, CV_RGB(255, 0, 0), 2);
-
-/*		std::cout << tij << std::endl;
-		std::cout << Rij << std::endl << std::endl;*/
-
-		for(int l = 0; l < corners_i.size(); l++){
-			cv::circle(image_L_i_out, corners_i[l], 4, color, -1, 8, 0);
-			cv::circle(image_L_j_out, corners_j[l], 4, color, -1, 8, 0);
-		}
-		imshow("features_i", image_L_i_out);	
-		cv::waitKey(30);
-		imshow("features_j", image_L_j_out);
-		cv::waitKey(30);	
-		imshow("Trajectory", traj);
-		cv::waitKey(30);	
-		corners_i.clear();
-		corners_j.clear();
+		fsSettings["useFAST"] >> useFAST;
+		std::cout << "Parameters Loaded Successfully" << std::endl << std::endl;
 	}
-	imshow("features_i", image_L_i_out);	
-	cv::waitKey(0);
-	imshow("features_j", image_L_j_out);
-	cv::waitKey(0);	
-	imshow("Trajectory", traj);
-	cv::waitKey(0);
-	cv::destroyWindow("features_i");
-	cv::destroyWindow("features_j");
-	cv::destroyWindow("Trajectory");
-	return 0;
 }
+
+void movo::detectGoodFeatures(cv::Mat img, 
+							  std::vector<cv::Point2f> &corners) {
+	cv::TermCriteria termcrit = 
+				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
+	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, cv::Mat(),
+						blockSize, useHarrisDetector, k);
+	cornerSubPix(img, corners, cv::Size(winSizeGFTT, winSizeGFTT), 
+				 cv::Size(-1, -1), termcrit);
+}
+
+void movo::detectFASTFeatures(cv::Mat img, 
+							  std::vector<cv::Point2f> &corners) {
+	cv::TermCriteria termcrit = 
+				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
+	std::vector<cv::KeyPoint> keypoints;
+	cv::FAST(img, keypoints, fast_threshold, nonmaxSuppression);
+	cv::KeyPoint::convert(keypoints, corners, std::vector<int>());
+	cornerSubPix(img, corners, cv::Size(winSizeFAST, winSizeFAST),
+				 cv::Size(-1, -1), termcrit);
+}
+
+std::vector<uchar> movo::calculateOpticalFlow(cv::Mat img1, cv::Mat img2, 
+							  				  std::vector<cv::Point2f> &corners1,
+							  				  std::vector<cv::Point2f> &corners2) {
+	cv::TermCriteria termcrit = cv::TermCriteria(
+			cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
+	std::vector<uchar> status;
+	std::vector<float> err;
+	calcOpticalFlowPyrLK(img1, img2, corners1, corners2, status, err, 
+						 cv::Size(2*winSizeGFTT + 1, 2*winSizeGFTT + 1), 
+						 3, termcrit, 0, 0.001); 	
+	return status;
+}
+
+cv::Mat movo::poseEstimation(std::vector<cv::Point2f> corners1,
+					         std::vector<cv::Point2f> corners2,
+					         cv::Mat &R, cv::Mat &t) {
+	std::vector<cv::Point2f> corners1_ud, corners2_ud;
+	undistortPoints(corners1, corners1_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+	undistortPoints(corners2, corners2_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+	cv::Mat mask;
+	cv::Mat essMat = findEssentialMat(corners1_ud, corners2_ud, 1.0, cv::Point2d(0.0, 0.0), 
+							  cv::RANSAC, 0.99, 
+							  10.0/(K.at<double>(0, 0)+K.at<double>(1, 1)), mask);
+	recoverPose(essMat, corners1_ud, corners2_ud, R, t, 1.0, cv::Point2d(0.0, 0.0), mask);
+	return mask;
+}
+
+void movo::filterbyMask(cv::Mat mask,
+					    std::vector<cv::Point2f> &corners1,
+					    std::vector<cv::Point2f> &corners2) {
+	int j = 0;
+	mask.convertTo(mask, CV_64F);
+	for(int i = 0; i < corners1.size(); i++) {
+		if(mask.at<double>(i, 0)==0) {
+			continue;
+		}
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+	std::cout << corners1.size() << std::endl;
+}
+
+void movo::filterbyStatus(std::vector<uchar> status,
+					      std::vector<cv::Point2f> &corners1,
+					      std::vector<cv::Point2f> &corners2) {
+	int j = 0;
+	for(int i = 0; i < status.size(); i++) {
+		if(status[i] == 0 ||
+		   corners2[i].x < 0 || corners2[i].y < 0 ||
+		   corners2[i].x > img1.cols || corners2[i].y > img1.rows) continue;
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+}
+
+void movo::initialize(uint frame1, uint frame2) {
+	img1 = imread(filenames_left[frame1], CV_8UC1);
+	undistort(img1, img1_ud, K, cv::noArray(), K);
+	img2 = imread(filenames_left[frame2], CV_8UC1);
+	undistort(img2, img2_ud, K, cv::noArray(), K);
+
+	std::vector<cv::Point2f> corners1, corners2;
+	std::vector<cv::Point2f> corners1_ud, corners2_ud;
+	std::vector<uchar> status;
+	if(true) {
+		detectFASTFeatures(img1_ud, corners1);
+	} else {
+		detectGoodFeatures(img1_ud, corners1);
+	}
+	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
+	filterbyStatus(status, corners1, corners2);
+	mask = poseEstimation(corners2, corners1, R, t);
+    std::cout << mask.size() << std::endl;
+	filterbyMask(mask, corners1, corners2);
+	drawmatches(img1_ud, img2_ud, corners1, corners2);
+}
+
+void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
+				   	   std::vector<cv::Point2f> corners1,
+					   std::vector<cv::Point2f> corners2) {
+	
+	cv::cvtColor(img1, img1_out, CV_GRAY2BGR);
+	cv::cvtColor(img2, img2_out, CV_GRAY2BGR);
+	for(int l = 0; l < corners1.size(); l++){
+		cv::circle(img1_out, corners1[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
+		cv::circle(img2_out, corners2[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
+	}	
+	imshow("img1", img1_out);
+	cv::waitKey(0);
+	imshow("img2", img2_out);
+	cv::waitKey(0);
+}
+
