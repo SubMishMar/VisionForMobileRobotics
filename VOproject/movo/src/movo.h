@@ -8,11 +8,11 @@
 #include <opencv2/core/eigen.hpp>
 
 
-#include <pcl/common/common_headers.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/visualization/pcl_visualizer.h>
+// #include <pcl/common/common_headers.h>
+// #include <pcl/io/pcd_io.h>
+// #include <pcl/point_types.h>
+// #include <pcl/point_cloud.h>
+// #include <pcl/visualization/pcl_visualizer.h>
 
 class movo{
 private:
