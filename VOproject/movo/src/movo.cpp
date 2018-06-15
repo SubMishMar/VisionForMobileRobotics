@@ -95,7 +95,6 @@ void movo::filterbyMask(cv::Mat mask,
 	}
 	corners1.resize(j);
 	corners2.resize(j);	
-	std::cout << corners1.size() << std::endl;
 }
 
 void movo::filterbyStatus(std::vector<uchar> status,
@@ -114,28 +113,6 @@ void movo::filterbyStatus(std::vector<uchar> status,
 	corners2.resize(j);	
 }
 
-void movo::initialize(uint frame1, uint frame2) {
-	img1 = imread(filenames_left[frame1], CV_8UC1);
-	undistort(img1, img1_ud, K, cv::noArray(), K);
-	img2 = imread(filenames_left[frame2], CV_8UC1);
-	undistort(img2, img2_ud, K, cv::noArray(), K);
-
-	std::vector<cv::Point2f> corners1, corners2;
-	std::vector<cv::Point2f> corners1_ud, corners2_ud;
-	std::vector<uchar> status;
-	if(true) {
-		detectFASTFeatures(img1_ud, corners1);
-	} else {
-		detectGoodFeatures(img1_ud, corners1);
-	}
-	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
-	filterbyStatus(status, corners1, corners2);
-	mask = poseEstimation(corners2, corners1, R, t);
-    std::cout << mask.size() << std::endl;
-	filterbyMask(mask, corners1, corners2);
-	drawmatches(img1_ud, img2_ud, corners1, corners2);
-}
-
 void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
 				   	   std::vector<cv::Point2f> corners1,
 					   std::vector<cv::Point2f> corners2) {
@@ -151,4 +128,55 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 	imshow("img2", img2_out);
 	cv::waitKey(0);
 }
+
+cv::Mat movo::convertFromHomogeneous(cv::Mat p3h) {
+	cv::Mat p3d = cv::Mat::zeros(p3h.rows-1, p3h.cols, CV_64FC1);
+	for(int i = 0; i < p3h.cols; i++) {
+	  cv::Mat p3d_col_i;
+	  cv::Mat p3h_col_i = p3h.col(i);
+	  convertPointsFromHomogeneous(p3h_col_i.t(), p3d_col_i);
+	  p3d.at<double>(0,i) = p3d_col_i.at<double>(0);
+	  p3d.at<double>(1,i) = p3d_col_i.at<double>(1);
+	  p3d.at<double>(2,i) = p3d_col_i.at<double>(2);
+	}
+	return p3d;
+}
+void movo::initialize(uint frame1, uint frame2) {
+	img1 = imread(filenames_left[frame1], CV_8UC1);
+	undistort(img1, img1_ud, K, cv::noArray(), K);
+	img2 = imread(filenames_left[frame2], CV_8UC1);
+	undistort(img2, img2_ud, K, cv::noArray(), K);
+
+	std::vector<cv::Point2f> corners1, corners2;
+	std::vector<uchar> status;
+	if(false) {
+		detectFASTFeatures(img1_ud, corners1);
+	} else {
+		detectGoodFeatures(img1_ud, corners1);
+	}
+	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
+	filterbyStatus(status, corners1, corners2);
+	mask = poseEstimation(corners1, corners2, R, t);
+	filterbyMask(mask, corners1, corners2);
+	drawmatches(img1_ud, img2_ud, corners1, corners2);
+	std::vector<cv::Point2f> corners1_ud, corners2_ud;
+	undistortPoints(corners1, corners1_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+	undistortPoints(corners2, corners2_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+	std::vector<cv::Point2d> triangulation_pts1, triangulation_pts2;
+	for(int i = 0; i < corners1.size(); i++) {
+		triangulation_pts1.push_back
+							(cv::Point2d((double)corners1_ud[i].x, (double)corners1_ud[i].y));
+		triangulation_pts2.push_back
+							(cv::Point2d((double)corners2_ud[i].x, (double)corners2_ud[i].y));
+	}
+
+	cv::Mat M0 = cv::Mat::eye(3, 4, CV_64FC1);
+	cv::Mat M1 = cv::Mat::eye(3, 4, CV_64FC1);
+	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
+	t.copyTo(M1.rowRange(0, 3).col(3));
+	cv::triangulatePoints(M0, M1, triangulation_pts1, triangulation_pts2, point3d_homo);
+	point3d_unhomo = convertFromHomogeneous(point3d_homo);
+}
+
+
 

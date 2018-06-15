@@ -11,7 +11,7 @@ P0: !!opencv-matrix
 #For GFFT
 maxCorners: 1000
 qualityLevel: 0.001
-minDistance: 20
+minDistance: 10
 blockSize: 3
 useHarrisDetector: False
 k: 0.04

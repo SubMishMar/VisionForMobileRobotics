@@ -39,11 +39,13 @@ private:
     cv::String folder_left;
     std::string config_file; 
 
-    // Image containers and related
+    // Image containers and related Mats
     cv::Mat img1, img2;
     cv::Mat img1_out, img2_out;
     cv::Mat img1_ud, img2_ud;
     cv::Mat mask;
+    cv::Mat point3d_homo;
+    cv::Mat point3d_unhomo;
 
     //
     bool useFAST;
@@ -91,5 +93,8 @@ public:
 	void drawmatches(cv::Mat img1, cv::Mat img2, 
 					 std::vector<cv::Point2f> corners1,
 					 std::vector<cv::Point2f> corners2);
+
+	//Convert Homogenous 3d pts to non-homogenous
+	cv::Mat convertFromHomogeneous(cv::Mat p3h);
 
 };
