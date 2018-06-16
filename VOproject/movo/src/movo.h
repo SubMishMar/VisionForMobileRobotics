@@ -74,7 +74,7 @@ public:
 							  				std::vector<cv::Point2f> &corners2);
 
 	//Estimates R, t from tracked feature points and returns an inlier mask
-	cv::Mat poseEstimation(std::vector<cv::Point2f> corners1,
+	cv::Mat epipolarSearch(std::vector<cv::Point2f> corners1,
 					       std::vector<cv::Point2f> corners2,
 					       cv::Mat &R, cv::Mat &t);
 
@@ -97,4 +97,6 @@ public:
 	//Convert Homogenous 3d pts to non-homogenous
 	cv::Mat convertFromHomogeneous(cv::Mat p3h);
 
+	//Continous VO operation
+	void continousOperation(uint, std::vector<cv::Point2f>, cv::Mat);
 };

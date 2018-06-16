@@ -67,7 +67,7 @@ std::vector<uchar> movo::calculateOpticalFlow(cv::Mat img1, cv::Mat img2,
 	return status;
 }
 
-cv::Mat movo::poseEstimation(std::vector<cv::Point2f> corners1,
+cv::Mat movo::epipolarSearch(std::vector<cv::Point2f> corners1,
 					         std::vector<cv::Point2f> corners2,
 					         cv::Mat &R, cv::Mat &t) {
 	std::vector<cv::Point2f> corners1_ud, corners2_ud;
@@ -128,6 +128,9 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 	cv::waitKey(0);
 	imshow("img2", img2_out);
 	cv::waitKey(0);
+
+	cv::destroyWindow("img1");
+	cv::destroyWindow("img2");
 }
 
 cv::Mat movo::convertFromHomogeneous(cv::Mat p3h) {
@@ -157,7 +160,7 @@ void movo::initialize(uint frame1, uint frame2) {
 	}
 	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
 	filterbyStatus(status, corners1, corners2);
-	mask = poseEstimation(corners1, corners2, R, t);
+	mask = epipolarSearch(corners1, corners2, R, t);
 	filterbyMask(mask, corners1, corners2);
 	drawmatches(img1_ud, img2_ud, corners1, corners2);
 	std::vector<cv::Point2f> corners1_ud, corners2_ud;
@@ -177,7 +180,32 @@ void movo::initialize(uint frame1, uint frame2) {
 	t.copyTo(M1.rowRange(0, 3).col(3));
 	cv::triangulatePoints(M0, M1, triangulation_pts1, triangulation_pts2, point3d_homo);
 	point3d_unhomo = convertFromHomogeneous(point3d_homo);
+	continousOperation(frame2, corners2, point3d_unhomo);
 }
 
+void movo::continousOperation(uint frame_id,
+							  std::vector<cv::Point2f> corners,
+							  cv::Mat landmark_pts) {
+	uint database_id = frame_id;
+	uint query_id = database_id + 1; 
+	std::vector<cv::Point2f> database_corners = corners;
+	std::vector<cv::Point2f> query_corners;
+	cv::Mat database_img, query_img;
+	undistort(imread(filenames_left[database_id], CV_8UC1), 
+				database_img, K, cv::noArray(), K);
+
+	while(query_id < filenames_left.size()) {
+		undistort(imread(filenames_left[query_id], CV_8UC1), 
+					query_img, K, cv::noArray(), K);
+		std::vector<uchar> status;
+		status = calculateOpticalFlow(database_img,  query_img,
+									  database_corners, query_corners);
+		
+		filterbyStatus(status, database_corners, query_corners);
+		query_corners = database_corners;
+		query_img.copyTo(database_img);
+		query_id++;
+	}
+}
 
 
