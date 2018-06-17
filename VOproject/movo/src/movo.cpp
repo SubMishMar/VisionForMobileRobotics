@@ -4,6 +4,7 @@
 movo::movo(int argc, char **argv){
 	readParams(argc, argv);
 	K = P_L(cv::Range(0,3), cv::Range(0, 3));
+	useFAST = false;
 }
 void movo::readParams(int argc, char **argv) {
 	folder_left = argv[1];
@@ -28,18 +29,19 @@ void movo::readParams(int argc, char **argv) {
 		fsSettings["nonmaxSuppression"] >> nonmaxSuppression;
 		fsSettings["winSizeFAST"] >> winSizeFAST;
 
-		fsSettings["useFAST"] >> useFAST;
+		// fsSettings["useFAST"] >> useFAST;
 		std::cout << "Parameters Loaded Successfully" << std::endl << std::endl;
 	}
 }
 
 void movo::detectGoodFeatures(cv::Mat img, 
-							  std::vector<cv::Point2f> &corners) {
+							  std::vector<cv::Point2f> &corners,
+							  cv::Mat mask_mat) {
 	cv::TermCriteria termcrit = 
 				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
-	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, cv::Mat(),
+	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, mask_mat,
 						blockSize, useHarrisDetector, k);
-	cornerSubPix(img, corners, cv::Size(winSizeGFTT, winSizeGFTT), 
+	cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
 				 cv::Size(-1, -1), termcrit);
 }
 
@@ -62,7 +64,7 @@ std::vector<uchar> movo::calculateOpticalFlow(cv::Mat img1, cv::Mat img2,
 	std::vector<uchar> status;
 	std::vector<float> err;
 	calcOpticalFlowPyrLK(img1, img2, corners1, corners2, status, err, 
-						 cv::Size(2*winSizeGFTT + 1, 2*winSizeGFTT + 1), 
+						 cv::Size(winSizeGFTT + 1, winSizeGFTT + 1), 
 						 3, termcrit, 0, 0.001); 	
 	return status;
 }
@@ -85,7 +87,6 @@ void movo::filterbyMask(cv::Mat mask,
 					    std::vector<cv::Point2f> &corners1,
 					    std::vector<cv::Point2f> &corners2) {
 	int j = 0;
-	//mask.convertTo(mask, CV_64F);
 	for(int i = 0; i < corners1.size(); i++) {
 		if(!mask.at<unsigned char>(i)) {
 			continue;
@@ -96,6 +97,25 @@ void movo::filterbyMask(cv::Mat mask,
 	}
 	corners1.resize(j);
 	corners2.resize(j);	
+}
+
+void movo::filterbyMask(cv::Mat mask,
+					    std::vector<cv::Point2f> &corners1,
+					    std::vector<cv::Point2f> &corners2,
+					    std::vector<cv::Point3f> &landmarks) {
+	int j = 0;
+	for(int i = 0; i < corners1.size(); i++) {
+		if(!mask.at<unsigned char>(i)) {
+			continue;
+		}
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		landmarks[j] = landmarks[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+	landmarks.resize(j);
 }
 
 void movo::filterbyStatus(std::vector<uchar> status,
@@ -114,6 +134,25 @@ void movo::filterbyStatus(std::vector<uchar> status,
 	corners2.resize(j);	
 }
 
+void movo::filterbyStatus(std::vector<uchar> status,
+					      std::vector<cv::Point2f> &corners1,
+					      std::vector<cv::Point2f> &corners2,
+					      std::vector<cv::Point3f> &landmarks) {
+	int j = 0;
+	for(int i = 0; i < status.size(); i++) {
+		if(status[i] == 0 ||
+		   corners2[i].x < 0 || corners2[i].y < 0 ||
+		   corners2[i].x > img1.cols || corners2[i].y > img1.rows) continue;
+		corners1[j] = corners1[i];
+		corners2[j] = corners2[i];
+		landmarks[j] = landmarks[i];
+		j++;
+	}
+	corners1.resize(j);
+	corners2.resize(j);	
+	landmarks.resize(j);
+}
+
 void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
 				   	   std::vector<cv::Point2f> corners1,
 					   std::vector<cv::Point2f> corners2) {
@@ -128,22 +167,18 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 	cv::waitKey(0);
 	imshow("img2", img2_out);
 	cv::waitKey(0);
-
-	cv::destroyWindow("img1");
-	cv::destroyWindow("img2");
 }
 
-cv::Mat movo::convertFromHomogeneous(cv::Mat p3h) {
-	cv::Mat p3d = cv::Mat::zeros(p3h.rows-1, p3h.cols, CV_64FC1);
+void movo::convertFromHomogeneous(cv::Mat p3h, std::vector<cv::Point3f> &p3uh) {
 	for(int i = 0; i < p3h.cols; i++) {
 	  cv::Mat p3d_col_i;
 	  cv::Mat p3h_col_i = p3h.col(i);
 	  convertPointsFromHomogeneous(p3h_col_i.t(), p3d_col_i);
-	  p3d.at<double>(0,i) = p3d_col_i.at<double>(0);
-	  p3d.at<double>(1,i) = p3d_col_i.at<double>(1);
-	  p3d.at<double>(2,i) = p3d_col_i.at<double>(2);
+	  float x = (float)p3d_col_i.at<double>(0);
+	  float y = (float)p3d_col_i.at<double>(1);
+	  float z = (float)p3d_col_i.at<double>(2);
+	  p3uh.push_back(cv::Point3f(x, y, z));
 	}
-	return p3d;
 }
 void movo::initialize(uint frame1, uint frame2) {
 	img1 = imread(filenames_left[frame1], CV_8UC1);
@@ -153,10 +188,10 @@ void movo::initialize(uint frame1, uint frame2) {
 
 	std::vector<cv::Point2f> corners1, corners2;
 	std::vector<uchar> status;
-	if(false) {
+	if(useFAST) {
 		detectFASTFeatures(img1_ud, corners1);
 	} else {
-		detectGoodFeatures(img1_ud, corners1);
+		detectGoodFeatures(img1_ud, corners1, cv::Mat::ones(img1_ud.rows, img1_ud.cols, CV_8UC1));
 	}
 	status = calculateOpticalFlow(img1_ud, img2_ud, corners1, corners2);
 	filterbyStatus(status, corners1, corners2);
@@ -179,13 +214,13 @@ void movo::initialize(uint frame1, uint frame2) {
 	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
 	t.copyTo(M1.rowRange(0, 3).col(3));
 	cv::triangulatePoints(M0, M1, triangulation_pts1, triangulation_pts2, point3d_homo);
-	point3d_unhomo = convertFromHomogeneous(point3d_homo);
+	convertFromHomogeneous(point3d_homo, point3d_unhomo);
 	continousOperation(frame2, corners2, point3d_unhomo);
 }
 
 void movo::continousOperation(uint frame_id,
 							  std::vector<cv::Point2f> corners,
-							  cv::Mat landmark_pts) {
+							  std::vector<cv::Point3f> landmarks_3d) {
 	uint database_id = frame_id;
 	uint query_id = database_id + 1; 
 	std::vector<cv::Point2f> database_corners = corners;
@@ -194,18 +229,53 @@ void movo::continousOperation(uint frame_id,
 	undistort(imread(filenames_left[database_id], CV_8UC1), 
 				database_img, K, cv::noArray(), K);
 
+	cv::Mat rvec, tvec, R;
 	while(query_id < filenames_left.size()) {
+
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
 		std::vector<uchar> status;
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
+		filterbyStatus(status, database_corners, query_corners, landmarks_3d);
+		mask = epipolarSearch(database_corners, query_corners, R, t);
+		filterbyMask(mask, database_corners, query_corners, landmarks_3d);
+
+		std::vector<int> inliers;
+		solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
+					   false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+		double pc_inliers = ((double)inliers.size())/((double)query_corners.size());
 		
-		filterbyStatus(status, database_corners, query_corners);
-		query_corners = database_corners;
-		query_img.copyTo(database_img);
-		query_id++;
+		std::cout << database_corners.size() << "\t" << query_corners.size() 
+				  << "\t" << landmarks_3d.size() << "\t" << inliers.size() << "\t" << pc_inliers << std::endl;
+		
+		if(pc_inliers > 0.5 && query_corners.size() > 150) {
+			Rodrigues(rvec, R, cv::noArray());
+			std::cout << -R.inv()*tvec << std::endl;
+			drawmatches(database_img, query_img, database_corners, query_corners);
+			database_corners = query_corners;
+			query_img.copyTo(database_img);
+			query_id++;
+		} else {
+			std::cout << "Too few points tracked, detect new features to Track" << std::endl;
+			cv::Mat mask_mat(database_img.size(), CV_8UC1, cv::Scalar::all(255));
+			cv::Mat mask_mat_color;
+			cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+			for(int i = 0; i < database_corners.size(); i++) {
+				cv::circle(mask_mat_color, database_corners[i], 25, CV_RGB(0,0,0),-8,0);
+			}
+			cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+			std::vector<cv::Point2f> new_database_corners;
+			detectGoodFeatures(database_img, new_database_corners, mask_mat);
+
+			database_corners.insert(database_corners.end(), new_database_corners.begin(), new_database_corners.end());
+			cv::waitKey(0);		
+		}
 	}
+	cv::destroyWindow("img1");
+	cv::destroyWindow("img2");
+
+
 }
 
 

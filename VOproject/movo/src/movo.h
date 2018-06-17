@@ -39,14 +39,14 @@ private:
     cv::String folder_left;
     std::string config_file; 
 
-    // Image containers and related Mats
+    // Image containers and related Mats and Vectors
     cv::Mat img1, img2;
     cv::Mat img1_out, img2_out;
     cv::Mat img1_ud, img2_ud;
     cv::Mat mask;
     cv::Mat point3d_homo;
-    cv::Mat point3d_unhomo;
-
+    std::vector<cv::Point3f> point3d_unhomo;
+    
     //
     bool useFAST;
 
@@ -61,7 +61,8 @@ public:
 
 	// detects gftt
 	void detectGoodFeatures(cv::Mat img, 
-							std::vector<cv::Point2f> &corners);
+							std::vector<cv::Point2f> &corners,
+							cv::Mat mask_mat);
 
 	//detects FAST features
 	void detectFASTFeatures(cv::Mat img, 
@@ -86,17 +87,27 @@ public:
 					  std::vector<cv::Point2f> &corners1,
 					  std::vector<cv::Point2f> &corners2);
 
+	void filterbyMask(cv::Mat mask,
+					  std::vector<cv::Point2f> &corners1,
+					  std::vector<cv::Point2f> &corners2,
+					  std::vector<cv::Point3f> &landmarks);
+
 	void filterbyStatus(std::vector<uchar> status,
 					    std::vector<cv::Point2f> &corners1,
 					    std::vector<cv::Point2f> &corners2);
+
+	void filterbyStatus(std::vector<uchar> status,
+					    std::vector<cv::Point2f> &corners1,
+					    std::vector<cv::Point2f> &corners2,
+					    std::vector<cv::Point3f> &landmarks);
 	//Drawmatches
 	void drawmatches(cv::Mat img1, cv::Mat img2, 
 					 std::vector<cv::Point2f> corners1,
 					 std::vector<cv::Point2f> corners2);
 
 	//Convert Homogenous 3d pts to non-homogenous
-	cv::Mat convertFromHomogeneous(cv::Mat p3h);
+	void convertFromHomogeneous(cv::Mat p3h, std::vector<cv::Point3f> &p3uh);
 
 	//Continous VO operation
-	void continousOperation(uint, std::vector<cv::Point2f>, cv::Mat);
+	void continousOperation(uint, std::vector<cv::Point2f>, std::vector<cv::Point3f>);
 };
