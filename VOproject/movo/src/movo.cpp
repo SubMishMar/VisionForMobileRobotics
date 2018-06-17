@@ -229,7 +229,8 @@ void movo::continousOperation(uint frame_id,
 	undistort(imread(filenames_left[database_id], CV_8UC1), 
 				database_img, K, cv::noArray(), K);
 
-	cv::Mat rvec, tvec, R;
+	cv::Mat rvec, tvec;
+	std::vector<cv::Point3f> rvecs, tvecs;
 	while(query_id < filenames_left.size()) {
 
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
@@ -237,21 +238,26 @@ void movo::continousOperation(uint frame_id,
 		std::vector<uchar> status;
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
+
 		filterbyStatus(status, database_corners, query_corners, landmarks_3d);
 		mask = epipolarSearch(database_corners, query_corners, R, t);
 		filterbyMask(mask, database_corners, query_corners, landmarks_3d);
 
 		std::vector<int> inliers;
 		solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
-					   false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+					    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+		Rodrigues(rvec, R, cv::noArray());
+		rvecs.push_back(cv::Point3f(rvec.at<double>(0), rvec.at<double>(1), rvec.at<double>(2)));
+		tvecs.push_back(cv::Point3f(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)));
+		std::cout << rvecs << std::endl;
+		std::cout << tvecs << std::endl;
+		//std::cout << -R.inv()*tvec << std::endl;
 		double pc_inliers = ((double)inliers.size())/((double)query_corners.size());
 		
-		std::cout << database_corners.size() << "\t" << query_corners.size() 
-				  << "\t" << landmarks_3d.size() << "\t" << inliers.size() << "\t" << pc_inliers << std::endl;
+		// std::cout << database_corners.size() << "\t" << query_corners.size() 
+		// 		  << "\t" << landmarks_3d.size() << "\t" << inliers.size() << "\t" << pc_inliers << std::endl;
 		
 		if(pc_inliers > 0.5 && query_corners.size() > 150) {
-			Rodrigues(rvec, R, cv::noArray());
-			std::cout << -R.inv()*tvec << std::endl;
 			drawmatches(database_img, query_img, database_corners, query_corners);
 			database_corners = query_corners;
 			query_img.copyTo(database_img);
@@ -265,17 +271,26 @@ void movo::continousOperation(uint frame_id,
 				cv::circle(mask_mat_color, database_corners[i], 25, CV_RGB(0,0,0),-8,0);
 			}
 			cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
-			std::vector<cv::Point2f> new_database_corners;
+			std::vector<cv::Point2f> new_database_corners, new_query_corners;
 			detectGoodFeatures(database_img, new_database_corners, mask_mat);
-
+			status = calculateOpticalFlow(database_img,  query_img, new_database_corners, new_query_corners);
+			filterbyStatus(status, new_database_corners, new_query_corners);
+			std::vector<cv::Point2f> new_database_corners_ud, new_query_corners_ud;
+			undistortPoints(new_database_corners, new_database_corners_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+			undistortPoints(new_query_corners, new_query_corners_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
+			std::vector<cv::Point2d> triangulation_pts1, triangulation_pts2;
+			for(int i = 0; i < new_query_corners.size(); i++) {
+				triangulation_pts1.push_back
+									(cv::Point2d((double)new_database_corners_ud[i].x, (double)new_database_corners_ud[i].y));
+				triangulation_pts2.push_back
+									(cv::Point2d((double)new_query_corners_ud[i].x, (double)new_query_corners_ud[i].y));
+			}
 			database_corners.insert(database_corners.end(), new_database_corners.begin(), new_database_corners.end());
-			cv::waitKey(0);		
+			break;	
 		}
 	}
 	cv::destroyWindow("img1");
 	cv::destroyWindow("img2");
-
-
 }
 
 
