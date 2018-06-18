@@ -218,6 +218,21 @@ void movo::initialize(uint frame1, uint frame2) {
 	continousOperation(frame2, corners2, point3d_unhomo);
 }
 
+cv::Mat movo::vector2mat(cv::Point2f pt2d) {
+	cv::Mat pt2d_mat=cv::Mat::zeros(2, 1, CV_64FC1);
+	pt2d_mat.at<double>(0) = pt2d.x;
+	pt2d_mat.at<double>(1) = pt2d.y;
+	return pt2d_mat;
+}
+
+cv::Mat movo::vector2mat(cv::Point3f pt3d) {
+	cv::Mat pt3d_mat=cv::Mat::zeros(3, 1, CV_64FC1);
+	pt3d_mat.at<double>(0) = pt3d.x;
+	pt3d_mat.at<double>(1) = pt3d.y;
+	pt3d_mat.at<double>(2) = pt3d.z;
+	return pt3d_mat;
+}
+
 void movo::continousOperation(uint frame_id,
 							  std::vector<cv::Point2f> corners,
 							  std::vector<cv::Point3f> landmarks_3d) {
@@ -231,6 +246,9 @@ void movo::continousOperation(uint frame_id,
 
 	cv::Mat rvec, tvec;
 	std::vector<cv::Point3f> rvecs, tvecs;
+	cv::Mat R_database, R_query, t_database, t_query;
+	cv::Mat M_database = cv::Mat::eye(3, 4, CV_64FC1);
+	cv::Mat M_query = cv::Mat::eye(3, 4, CV_64FC1);
 	while(query_id < filenames_left.size()) {
 
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
@@ -246,12 +264,10 @@ void movo::continousOperation(uint frame_id,
 		std::vector<int> inliers;
 		solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
 					    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
-		Rodrigues(rvec, R, cv::noArray());
+
 		rvecs.push_back(cv::Point3f(rvec.at<double>(0), rvec.at<double>(1), rvec.at<double>(2)));
 		tvecs.push_back(cv::Point3f(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)));
-		std::cout << rvecs << std::endl;
-		std::cout << tvecs << std::endl;
-		//std::cout << -R.inv()*tvec << std::endl;
+
 		double pc_inliers = ((double)inliers.size())/((double)query_corners.size());
 		
 		// std::cout << database_corners.size() << "\t" << query_corners.size() 
@@ -286,6 +302,26 @@ void movo::continousOperation(uint frame_id,
 									(cv::Point2d((double)new_query_corners_ud[i].x, (double)new_query_corners_ud[i].y));
 			}
 			database_corners.insert(database_corners.end(), new_database_corners.begin(), new_database_corners.end());
+			
+			t_database = vector2mat(tvecs.at(tvecs.size()-2));
+			Rodrigues(vector2mat(rvecs.at(rvecs.size()-2)), R_database, cv::noArray());
+
+			t_query = vector2mat(tvecs.at(tvecs.size()-1));
+			Rodrigues(vector2mat(rvecs.at(rvecs.size()-1)), R_query, cv::noArray()); 
+
+			R_database.copyTo(M_database.rowRange(0, 3).colRange(0, 3));
+			t_database.copyTo(M_database.rowRange(0, 3).col(3));
+
+			R_query.copyTo(M_query.rowRange(0, 3).colRange(0, 3));
+			t_query.copyTo(M_query.rowRange(0, 3).col(3));		
+
+			cv::triangulatePoints(M_database, 
+								  M_query, 
+								  triangulation_pts1, 
+								  triangulation_pts2, 
+								  point3d_homo);
+			convertFromHomogeneous(point3d_homo, point3d_unhomo);
+			std::cout << point3d_unhomo << std::endl;
 			break;	
 		}
 	}

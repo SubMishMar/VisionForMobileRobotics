@@ -100,6 +100,12 @@ public:
 					    std::vector<cv::Point2f> &corners1,
 					    std::vector<cv::Point2f> &corners2,
 					    std::vector<cv::Point3f> &landmarks);
+
+	void filterbyLmkZ( std::vector<cv::Point2f> &corners1,
+					    std::vector<cv::Point2f> &corners2,
+					    std::vector<cv::Point3f> &landmarks); 
+					    //Filters points which result 
+						 //in negative Z in landmarks
 	//Drawmatches
 	void drawmatches(cv::Mat img1, cv::Mat img2, 
 					 std::vector<cv::Point2f> corners1,
@@ -110,4 +116,8 @@ public:
 
 	//Continous VO operation
 	void continousOperation(uint, std::vector<cv::Point2f>, std::vector<cv::Point3f>);
+
+	//vector2mat
+	cv::Mat vector2mat(cv::Point3f);
+	cv::Mat vector2mat(cv::Point2f);
 };
