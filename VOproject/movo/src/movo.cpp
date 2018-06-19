@@ -41,8 +41,9 @@ void movo::detectGoodFeatures(cv::Mat img,
 				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
 	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, mask_mat,
 						blockSize, useHarrisDetector, k);
-	cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
-				 cv::Size(-1, -1), termcrit);
+	if(corners.size() > 0)
+		cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
+				 	cv::Size(-1, -1), termcrit);
 }
 
 void movo::detectFASTFeatures(cv::Mat img, 
@@ -201,7 +202,7 @@ void movo::initialize(uint frame1, uint frame2) {
 	filterbyStatus(status, corners1, corners2);
 	mask = epipolarSearch(corners1, corners2, R, t);
 	filterbyMask(mask, corners1, corners2);
-	drawmatches(img1_ud, img2_ud, corners1, corners2);
+	//drawmatches(img1_ud, img2_ud, corners1, corners2);
 	std::vector<cv::Point2f> corners1_ud, corners2_ud;
 	undistortPoints(corners1, corners1_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
 	undistortPoints(corners2, corners2_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
@@ -254,6 +255,7 @@ void movo::continousOperation(uint frame_id,
 	cv::Mat M_previousKF = cv::Mat::eye(3, 4, CV_64FC1);
 	cv::Mat M_currentKF = cv::Mat::eye(3, 4, CV_64FC1);
 	int count = 0;
+	bool new_triangulation = false;
 	while(query_id < filenames_left.size()) {
 		
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
@@ -262,12 +264,9 @@ void movo::continousOperation(uint frame_id,
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
 		filterbyStatus(status, database_corners, query_corners/*, landmarks_3d*/);
-		drawmatches(database_img, query_img, database_corners, query_corners);
-		std::cout << database_corners.size() << " " << query_corners.size() << std::endl;
-		if(query_id%10==0 || database_corners.size() < 200) {
-			std::cout << "Triangulate new landmarks" << std::endl;
-
-		}
+		//drawmatches(database_img, query_img, database_corners, query_corners);
+		std::cout << database_corners.size() << " " << query_corners.size() << " " << query_id << std::endl;
+		
 		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
 
 		cv::Mat mask_mat_color;
@@ -280,13 +279,15 @@ void movo::continousOperation(uint frame_id,
 		
 		detectGoodFeatures(query_img, new_query_corners, mask_mat);
 		query_corners.insert(query_corners.end(), new_query_corners.begin(), 
-								new_query_corners.end());
+		 						new_query_corners.end());
+
 		database_corners = query_corners;
+		new_query_corners.clear();
 		query_img.copyTo(database_img);
 		query_id++;
 	}
-	cv::destroyWindow("img1");
-	cv::destroyWindow("img2");
+	// cv::destroyWindow("img1");
+	// cv::destroyWindow("img2");
 }
 
 
