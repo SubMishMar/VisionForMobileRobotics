@@ -120,4 +120,7 @@ public:
 	//vector2mat
 	cv::Mat vector2mat(cv::Point3f);
 	cv::Mat vector2mat(cv::Point2f);
+
+	//Draw trajectory;
+	void drawTrajectory(cv::Mat, cv::Mat);
 };
