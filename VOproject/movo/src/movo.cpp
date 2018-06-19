@@ -164,9 +164,9 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 		cv::circle(img2_out, corners2[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
 	}	
 	imshow("img1", img1_out);
-	cv::waitKey(30);
+	cv::waitKey(0);
 	imshow("img2", img2_out);
-	cv::waitKey(30);
+	cv::waitKey(0);
 }
 
 void movo::drawTrajectory(cv::Mat R, cv::Mat t) {
@@ -243,18 +243,19 @@ void movo::continousOperation(uint frame_id,
 	uint database_id = frame_id;
 	uint query_id = database_id + 1; 
 	std::vector<cv::Point2f> database_corners = corners;
-	
+	std::vector<cv::Point2f> new_query_corners;
 	cv::Mat database_img, query_img;
 	undistort(imread(filenames_left[database_id], CV_8UC1), 
 				database_img, K, cv::noArray(), K);
 
 	cv::Mat rvec, tvec;
 	std::vector<cv::Point3f> rvecs, tvecs;
+	std::vector<cv::Point2f> query_corners;
 	cv::Mat M_previousKF = cv::Mat::eye(3, 4, CV_64FC1);
 	cv::Mat M_currentKF = cv::Mat::eye(3, 4, CV_64FC1);
 	int count = 0;
 	while(query_id < filenames_left.size()) {
-		std::vector<cv::Point2f> query_corners;
+		
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
 		std::vector<uchar> status;
@@ -264,23 +265,23 @@ void movo::continousOperation(uint frame_id,
 		drawmatches(database_img, query_img, database_corners, query_corners);
 		std::cout << database_corners.size() << " " << query_corners.size() << std::endl;
 		if(query_id%10==0 || database_corners.size() < 200) {
-			std::cout << "Triangulate and detect new features" << std::endl;
-			cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+			std::cout << "Triangulate new landmarks" << std::endl;
 
-			cv::Mat mask_mat_color;
-
-			cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-			for(int i = 0; i < query_corners.size(); i++) {
-				cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
-			}
-			cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
-			std::vector<cv::Point2f> new_query_corners;
-			detectGoodFeatures(query_img, new_query_corners, mask_mat);
-			query_corners.insert(query_corners.end(), new_query_corners.begin(), 
-									new_query_corners.end());
 		}
+		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+
+		cv::Mat mask_mat_color;
+
+		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+		for(int i = 0; i < query_corners.size(); i++) {
+			cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
+		}
+		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+		
+		detectGoodFeatures(query_img, new_query_corners, mask_mat);
+		query_corners.insert(query_corners.end(), new_query_corners.begin(), 
+								new_query_corners.end());
 		database_corners = query_corners;
-		query_corners.clear();
 		query_img.copyTo(database_img);
 		query_id++;
 	}
