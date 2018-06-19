@@ -51,7 +51,7 @@ private:
     bool useFAST;
 
     // pose
-    cv::Mat R, t;
+    cv::Mat R, t, Rpnp;
 public:
 	//construtor
 	movo(int, char**);
