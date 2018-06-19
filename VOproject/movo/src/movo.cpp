@@ -250,10 +250,9 @@ void movo::continousOperation(uint frame_id,
 
 	cv::Mat rvec, tvec;
 	std::vector<cv::Point3f> rvecs, tvecs;
-	cv::Mat R_database, R_query, t_database, t_query;
-	cv::Mat M_database = cv::Mat::eye(3, 4, CV_64FC1);
-	cv::Mat M_query = cv::Mat::eye(3, 4, CV_64FC1);
-
+	cv::Mat M_previousKF = cv::Mat::eye(3, 4, CV_64FC1);
+	cv::Mat M_currentKF = cv::Mat::eye(3, 4, CV_64FC1);
+	int count = 0;
 	while(query_id < filenames_left.size()) {
 		std::vector<cv::Point2f> query_corners;
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
@@ -261,34 +260,25 @@ void movo::continousOperation(uint frame_id,
 		std::vector<uchar> status;
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
-		std::cout << database_corners.size() << " " << query_corners.size() << std::endl;
-		filterbyStatus(status, database_corners, query_corners);
+		filterbyStatus(status, database_corners, query_corners/*, landmarks_3d*/);
 		drawmatches(database_img, query_img, database_corners, query_corners);
-		// mask = epipolarSearch(database_corners, query_corners, R, t);
-		// filterbyMask(mask, database_corners, query_corners, landmarks_3d);
+		std::cout << database_corners.size() << " " << query_corners.size() << std::endl;
+		if(query_id%10==0 || database_corners.size() < 200) {
+			std::cout << "Triangulate and detect new features" << std::endl;
+			cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
 
-		// std::vector<int> inliers;
-		// solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
-		// 				false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+			cv::Mat mask_mat_color;
 
-		// rvecs.push_back(cv::Point3f(rvec.at<double>(0), rvec.at<double>(1), rvec.at<double>(2)));
-		// tvecs.push_back(cv::Point3f(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)));
-
-		// double pc_inliers = ((double)inliers.size())/((double)query_corners.size());
-		
-		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
-
-		cv::Mat mask_mat_color;
-
-		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-		for(int i = 0; i < query_corners.size(); i++) {
-			cv::circle(mask_mat_color, query_corners[i], 15, CV_RGB(0,0,0),-8,0);
+			cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+			for(int i = 0; i < query_corners.size(); i++) {
+				cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
+			}
+			cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+			std::vector<cv::Point2f> new_query_corners;
+			detectGoodFeatures(query_img, new_query_corners, mask_mat);
+			query_corners.insert(query_corners.end(), new_query_corners.begin(), 
+									new_query_corners.end());
 		}
-		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
-		std::vector<cv::Point2f> new_query_corners;
-		detectGoodFeatures(query_img, new_query_corners, mask_mat);
-		query_corners.insert(query_corners.end(), new_query_corners.begin(), 
-								new_query_corners.end());
 		database_corners = query_corners;
 		query_corners.clear();
 		query_img.copyTo(database_img);
