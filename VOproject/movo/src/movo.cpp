@@ -41,11 +41,8 @@ void movo::detectGoodFeatures(cv::Mat img,
 				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
 	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, mask_mat,
 						blockSize, useHarrisDetector, k);
-<<<<<<< HEAD
-	if(corners.size()>0)
-=======
+
 	if(corners.size() > 0)
->>>>>>> 452215669568c7102f5c2d78a58d28013b35f37e
 		cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
 				 	cv::Size(-1, -1), termcrit);
 }
