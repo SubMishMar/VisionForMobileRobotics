@@ -41,8 +41,9 @@ void movo::detectGoodFeatures(cv::Mat img,
 				cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01);
 	goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, mask_mat,
 						blockSize, useHarrisDetector, k);
-	cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
-				 cv::Size(-1, -1), termcrit);
+	if(corners.size()>0)
+		cornerSubPix(img, corners, cv::Size(winSizeGFTT/2, winSizeGFTT/2), 
+				 	cv::Size(-1, -1), termcrit);
 }
 
 void movo::detectFASTFeatures(cv::Mat img, 
@@ -52,7 +53,8 @@ void movo::detectFASTFeatures(cv::Mat img,
 	std::vector<cv::KeyPoint> keypoints;
 	cv::FAST(img, keypoints, fast_threshold, nonmaxSuppression);
 	cv::KeyPoint::convert(keypoints, corners, std::vector<int>());
-	cornerSubPix(img, corners, cv::Size(winSizeFAST, winSizeFAST),
+	if(corners.size()>0)
+		cornerSubPix(img, corners, cv::Size(winSizeFAST, winSizeFAST),
 				 cv::Size(-1, -1), termcrit);
 }
 
@@ -212,7 +214,6 @@ void movo::initialize(uint frame1, uint frame2) {
 		triangulation_pts2.push_back
 							(cv::Point2d((double)corners2_ud[i].x, (double)corners2_ud[i].y));
 	}
-
 	cv::Mat M0 = cv::Mat::eye(3, 4, CV_64FC1);
 	cv::Mat M1 = cv::Mat::eye(3, 4, CV_64FC1);
 	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
