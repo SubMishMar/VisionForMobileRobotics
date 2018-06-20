@@ -156,6 +156,20 @@ void movo::filterbyStatus(std::vector<uchar> status,
 	landmarks.resize(j);
 }
 
+void movo::filterbyStatus(std::vector<uchar> status,
+					std::vector<cv::Point2f> corners,
+					std::vector<keypoint> &keypoints) {
+	int j = 0;
+	for(int i = 0; i < status.size(); i++) {
+		if(status[i] == 0 ||
+		   corners[i].x < 0 || corners[i].y < 0 ||
+		   corners[i].x > img1.cols || corners[i].y > img1.rows) continue;
+		keypoints[j] = keypoints[i];
+		j++;
+	}
+	keypoints.resize(j);
+}
+
 void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
 				   	   std::vector<cv::Point2f> corners1,
 					   std::vector<cv::Point2f> corners2) {
@@ -245,7 +259,7 @@ void movo::initialize(uint frame1, uint frame2) {
 							(cv::Point2d((double)corners2_ud[i].x, (double)corners2_ud[i].y));
 	}
 	cv::Mat M0 = cv::Mat::eye(3, 4, CV_64FC1);
-	corners2keypoint(corners2, candidate_kp, frame1, M0);
+	corners2keypoint(corners1, candidate_kp, frame1, M0);
 	cv::Mat M1 = cv::Mat::eye(3, 4, CV_64FC1);
 	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
 	t.copyTo(M1.rowRange(0, 3).col(3));
@@ -269,8 +283,8 @@ void movo::continousOperation(uint frame_id,
 	std::vector<cv::Point3f> rvecs, tvecs;
 	std::vector<cv::Point3f> new_landmarks_3d;
 	std::vector<cv::Point2f> query_corners;
-	cv::Mat M_previousKF = cv::Mat::eye(3, 4, CV_64FC1);
-	cv::Mat M_currentKF = cv::Mat::eye(3, 4, CV_64FC1);
+	cv::Mat M_previous = cv::Mat::eye(3, 4, CV_64FC1);
+	cv::Mat M_current = cv::Mat::eye(3, 4, CV_64FC1);
 	int count = 0;
 	bool new_triangulation = false;
 	while(query_id < filenames_left.size()) {
@@ -280,17 +294,24 @@ void movo::continousOperation(uint frame_id,
 		std::vector<uchar> status;
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
+		filterbyStatus(status, query_corners, candidate_kp);
 		filterbyStatus(status, database_corners, query_corners/*, landmarks_3d*/);
+		
+		std::vector<double> diff(candidate_kp.size());
+		for(int i = 0; i < candidate_kp.size(); i++) {
+			diff.push_back(candidate_kp[i].id0-query_id);
+			std::cout << abs((int)candidate_kp[i].id0 - (int)query_id) << std::endl;
+		}
+
 		// std::vector<int> inliers;
 		// solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
 		// 			    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
 		// Rodrigues(rvec, Rpnp, cv::noArray());
 		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
-		drawmatches(database_img, query_img, database_corners, query_corners);
-		std::cout << database_corners.size() << " " << query_corners.size() << " " << query_id << std::endl;
+		//drawmatches(database_img, query_img, database_corners, query_corners);
+		//std::cout << database_corners.size() << " " << query_corners.size() << " " 
+		//<< candidate_kp.size() << " " << query_id << std::endl;
 		
-
-
 		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
 		cv::Mat mask_mat_color;
 		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
@@ -300,6 +321,9 @@ void movo::continousOperation(uint frame_id,
 		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
 		
 		detectGoodFeatures(query_img, new_query_corners, mask_mat);
+		corners2keypoint(new_query_corners, candidate_kp, 
+							query_id, M_current);
+
 		query_corners.insert(query_corners.end(), new_query_corners.begin(), 
  						new_query_corners.end());
 

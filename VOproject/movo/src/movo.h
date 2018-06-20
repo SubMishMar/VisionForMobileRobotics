@@ -16,7 +16,7 @@
 struct keypoint
 {
 	cv::Point2f pt;
-	int id0;
+	uint id0;
 	cv::Mat M0;
 };
 
@@ -107,9 +107,16 @@ public:
 					    std::vector<cv::Point2f> &corners2,
 					    std::vector<cv::Point3f> &landmarks);
 
-	void filterbyLmkZ( std::vector<cv::Point2f> &corners1,
-					    std::vector<cv::Point2f> &corners2,
-					    std::vector<cv::Point3f> &landmarks); 
+	void filterbyStatus(std::vector<uchar> status,
+						std::vector<cv::Point2f> corners,
+						std::vector<keypoint> &keypoints);
+
+	void filterbyStatus(cv::Mat mask,
+						std::vector<keypoint> &keypoints);
+
+	void filterbyLmkZ(std::vector<cv::Point2f> &corners1,
+					   std::vector<cv::Point2f> &corners2,
+					   std::vector<cv::Point3f> &landmarks); 
 					    //Filters points which result 
 						 //in negative Z in landmarks
 	//Drawmatches
