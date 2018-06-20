@@ -176,6 +176,21 @@ void movo::drawTrajectory(cv::Mat R, cv::Mat t) {
 
 }
 
+cv::Mat movo::vector2mat(cv::Point2f pt2d) {
+	cv::Mat pt2d_mat=cv::Mat::zeros(2, 1, CV_64FC1);
+	pt2d_mat.at<double>(0) = pt2d.x;
+	pt2d_mat.at<double>(1) = pt2d.y;
+	return pt2d_mat;
+}
+
+cv::Mat movo::vector2mat(cv::Point3f pt3d) {
+	cv::Mat pt3d_mat=cv::Mat::zeros(3, 1, CV_64FC1);
+	pt3d_mat.at<double>(0) = pt3d.x;
+	pt3d_mat.at<double>(1) = pt3d.y;
+	pt3d_mat.at<double>(2) = pt3d.z;
+	return pt3d_mat;
+}
+
 void movo::convertFromHomogeneous(cv::Mat p3h, std::vector<cv::Point3f> &p3uh) {
 	for(int i = 0; i < p3h.cols; i++) {
 	  cv::Mat p3d_col_i;
@@ -185,6 +200,19 @@ void movo::convertFromHomogeneous(cv::Mat p3h, std::vector<cv::Point3f> &p3uh) {
 	  float y = (float)p3d_col_i.at<double>(1);
 	  float z = (float)p3d_col_i.at<double>(2);
 	  p3uh.push_back(cv::Point3f(x, y, z));
+	}
+}
+
+void movo::corners2keypoint(std::vector<cv::Point2f> corners,
+					  std::vector<keypoint> &keypoints,
+					  int frame,
+					  cv::Mat M) {
+	for(int i = 0; i < corners.size(); i++) {
+		keypoint kpt;
+		kpt.pt = corners[i];
+		kpt.id0 = frame;
+		kpt.M0 = M;
+		keypoints.push_back(kpt); 
 	}
 }
 void movo::initialize(uint frame1, uint frame2) {
@@ -204,6 +232,7 @@ void movo::initialize(uint frame1, uint frame2) {
 	filterbyStatus(status, corners1, corners2);
 	mask = epipolarSearch(corners1, corners2, R, t);
 	filterbyMask(mask, corners1, corners2);
+	
 	//drawmatches(img1_ud, img2_ud, corners1, corners2);
 	std::vector<cv::Point2f> corners1_ud, corners2_ud;
 	undistortPoints(corners1, corners1_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
@@ -216,27 +245,13 @@ void movo::initialize(uint frame1, uint frame2) {
 							(cv::Point2d((double)corners2_ud[i].x, (double)corners2_ud[i].y));
 	}
 	cv::Mat M0 = cv::Mat::eye(3, 4, CV_64FC1);
+	corners2keypoint(corners2, candidate_kp, frame1, M0);
 	cv::Mat M1 = cv::Mat::eye(3, 4, CV_64FC1);
 	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
 	t.copyTo(M1.rowRange(0, 3).col(3));
 	cv::triangulatePoints(M0, M1, triangulation_pts1, triangulation_pts2, point3d_homo);
 	convertFromHomogeneous(point3d_homo, point3d_unhomo);
 	continousOperation(frame2, corners2, point3d_unhomo);
-}
-
-cv::Mat movo::vector2mat(cv::Point2f pt2d) {
-	cv::Mat pt2d_mat=cv::Mat::zeros(2, 1, CV_64FC1);
-	pt2d_mat.at<double>(0) = pt2d.x;
-	pt2d_mat.at<double>(1) = pt2d.y;
-	return pt2d_mat;
-}
-
-cv::Mat movo::vector2mat(cv::Point3f pt3d) {
-	cv::Mat pt3d_mat=cv::Mat::zeros(3, 1, CV_64FC1);
-	pt3d_mat.at<double>(0) = pt3d.x;
-	pt3d_mat.at<double>(1) = pt3d.y;
-	pt3d_mat.at<double>(2) = pt3d.z;
-	return pt3d_mat;
 }
 
 void movo::continousOperation(uint frame_id,
@@ -262,73 +277,33 @@ void movo::continousOperation(uint frame_id,
 		
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
-		if(new_triangulation) {
-			std::cout << "Doing Triangulation Stuff" << std::endl;
-			new_triangulation = false;
-			std::vector<uchar> status;
-			status = calculateOpticalFlow(database_img,  query_img,
-										  database_corners, query_corners);
-			filterbyStatus(status, database_corners, query_corners, landmarks_3d);
-			mask = epipolarSearch(database_corners, query_corners, R, t);
-			filterbyMask(mask, database_corners, query_corners, landmarks_3d);
-			cv::Mat jRw = R*Rpnp;
-			cv::Mat jtw = R*tvec + t; 
-			Rpnp.copyTo(M_previousKF.rowRange(0, 3).colRange(0, 3));
-			tvec.copyTo(M_previousKF.rowRange(0, 3).col(3));
-			jRw.copyTo(M_currentKF.rowRange(0, 3).colRange(0, 3));
-			jtw.copyTo(M_currentKF.rowRange(0, 3).col(3));
-
-			status = calculateOpticalFlow(database_img,  query_img,
-										  new_database_corners, new_query_corners);
-			filterbyStatus(status, new_database_corners, new_query_corners);
-
-			std::vector<cv::Point2f> new_database_corners_ud, new_query_corners_ud;
-			undistortPoints(new_database_corners, new_database_corners_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
-			undistortPoints(new_query_corners, new_query_corners_ud, K, cv::noArray(), cv::noArray(), cv::noArray());
-			std::vector<cv::Point2d> triangulation_pts1, triangulation_pts2;
-			for(int i = 0; i < new_query_corners.size(); i++) {
-				triangulation_pts1.push_back
-									(cv::Point2d((double)new_database_corners_ud[i].x, (double)new_database_corners_ud[i].y));
-				triangulation_pts2.push_back
-									(cv::Point2d((double)new_query_corners_ud[i].x, (double)new_query_corners_ud[i].y));
-			}
-			cv::triangulatePoints(M_previousKF, M_currentKF, triangulation_pts1, triangulation_pts2, point3d_homo);
-	        convertFromHomogeneous(point3d_homo, new_landmarks_3d);
-			database_corners.insert(database_corners.end(), new_database_corners.begin(), 
- 						new_database_corners.end());
-			std::cout << new_landmarks_3d << std::endl << std::endl;
-			landmarks_3d.insert(landmarks_3d.end(), new_landmarks_3d.begin(), 
- 						new_landmarks_3d.end());
-
-		}
 		std::vector<uchar> status;
 		status = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
-		filterbyStatus(status, database_corners, query_corners, landmarks_3d);
-		std::vector<int> inliers;
-		solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
-					    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
-		Rodrigues(rvec, Rpnp, cv::noArray());
+		filterbyStatus(status, database_corners, query_corners/*, landmarks_3d*/);
+		// std::vector<int> inliers;
+		// solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
+		// 			    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+		// Rodrigues(rvec, Rpnp, cv::noArray());
 		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
-		//drawmatches(database_img, query_img, database_corners, query_corners);
-		//std::cout << database_corners.size() << " " << query_corners.size() << " " << query_id << std::endl;
+		drawmatches(database_img, query_img, database_corners, query_corners);
+		std::cout << database_corners.size() << " " << query_corners.size() << " " << query_id << std::endl;
 		
 
-		if(query_id%10==0) {
-			cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
-			cv::Mat mask_mat_color;
-			cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-			for(int i = 0; i < query_corners.size(); i++) {
-				cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
-			}
-			cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
-			
-			detectGoodFeatures(query_img, new_query_corners, mask_mat);
-			new_database_corners = new_query_corners;	
-			new_triangulation = true;		
+
+		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+		cv::Mat mask_mat_color;
+		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+		for(int i = 0; i < query_corners.size(); i++) {
+			cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
 		}
+		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+		
+		detectGoodFeatures(query_img, new_query_corners, mask_mat);
+		query_corners.insert(query_corners.end(), new_query_corners.begin(), 
+ 						new_query_corners.end());
+
 		database_corners = query_corners;
-		new_query_corners.clear();
 		query_img.copyTo(database_img);
 		query_id++;
 	}

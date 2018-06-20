@@ -13,6 +13,12 @@
 // #include <pcl/point_types.h>
 // #include <pcl/point_cloud.h>
 // #include <pcl/visualization/pcl_visualizer.h>
+struct keypoint
+{
+	cv::Point2f pt;
+	int id0;
+	cv::Mat M0;
+};
 
 class movo{
 private:
@@ -46,7 +52,7 @@ private:
     cv::Mat mask;
     cv::Mat point3d_homo;
     std::vector<cv::Point3f> point3d_unhomo;
-    
+    std::vector<keypoint> candidate_kp;
     //
     bool useFAST;
 
@@ -123,4 +129,10 @@ public:
 
 	//Draw trajectory;
 	void drawTrajectory(cv::Mat, cv::Mat);
+
+	//
+	void corners2keypoint(std::vector<cv::Point2f> src,
+						  std::vector<keypoint> &dst,
+						  int,
+						  cv::Mat);
 };
