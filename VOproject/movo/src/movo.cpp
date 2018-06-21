@@ -259,7 +259,6 @@ void movo::initialize(uint frame1, uint frame2) {
 							(cv::Point2d((double)corners2_ud[i].x, (double)corners2_ud[i].y));
 	}
 	cv::Mat M0 = cv::Mat::eye(3, 4, CV_64FC1);
-	corners2keypoint(corners1, candidate_kp, frame1, M0);
 	cv::Mat M1 = cv::Mat::eye(3, 4, CV_64FC1);
 	R.copyTo(M1.rowRange(0, 3).colRange(0, 3));
 	t.copyTo(M1.rowRange(0, 3).col(3));
@@ -274,7 +273,6 @@ void movo::continousOperation(uint frame_id,
 	uint database_id = frame_id;
 	uint query_id = database_id + 1; 
 	std::vector<cv::Point2f> database_corners = corners;
-	std::vector<cv::Point2f> new_query_corners, new_database_corners;
 	cv::Mat database_img, query_img;
 	undistort(imread(filenames_left[database_id], CV_8UC1), 
 				database_img, K, cv::noArray(), K);
@@ -283,6 +281,8 @@ void movo::continousOperation(uint frame_id,
 	std::vector<cv::Point3f> rvecs, tvecs;
 	std::vector<cv::Point3f> new_landmarks_3d;
 	std::vector<cv::Point2f> query_corners;
+	std::vector<cv::Point2f> new_candidate_corners;
+	std::vector<cv::Point2f> candidate_corners_j;
 	cv::Mat M_previous = cv::Mat::eye(3, 4, CV_64FC1);
 	cv::Mat M_current = cv::Mat::eye(3, 4, CV_64FC1);
 	int count = 0;
@@ -292,9 +292,13 @@ void movo::continousOperation(uint frame_id,
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
 		std::vector<uchar> status1, status2;
-		// status1 = calculateOpticalFlow(database_img, query_img,
-		// 							  new_database_corners, new_query_corners);
-		// filterbyStatus(status1, new);
+		if(candidate_corners.size()>0) {
+			status1 = calculateOpticalFlow(database_img,  query_img,
+										  candidate_corners, candidate_corners_j);
+			filterbyStatus(status1, candidate_corners_j, candidate_kp);		
+			filterbyStatus(status1, candidate_corners, candidate_corners_j);						
+		}
+
 		status2 = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
 		filterbyStatus(status2, database_corners, query_corners/*, landmarks_3d*/);
@@ -310,27 +314,38 @@ void movo::continousOperation(uint frame_id,
 		// 			    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
 		// Rodrigues(rvec, Rpnp, cv::noArray());
 		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
-		//drawmatches(database_img, query_img, database_corners, query_corners);
+		drawmatches(database_img, query_img, database_corners, query_corners);
 		std::cout << database_corners.size() << " " << query_corners.size() << " " 
-		/*<< candidate_kp.size() << */" " << query_id << std::endl;
+		<< candidate_kp.size() << " " << candidate_corners.size() << std::endl;
 		
 		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
 		cv::Mat mask_mat_color;
 		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-		for(int i = 0; i < query_corners.size(); i++) {
-			cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
+		std::vector<cv::Point2f> queryPlusCandidateCorners(query_corners.size()
+										+candidate_corners.size());
+
+
+		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+								query_corners.begin(), query_corners.end());
+		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+								candidate_corners_j.begin(), candidate_corners_j.end());
+
+		for(int i = 0; i < queryPlusCandidateCorners.size(); i++) {
+			cv::circle(mask_mat_color, queryPlusCandidateCorners[i], 
+				30, CV_RGB(0,0,0), -8, 0);
 		}
 		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
 		
-		detectGoodFeatures(query_img, new_query_corners, mask_mat);
-		corners2keypoint(new_query_corners, candidate_kp, 
+		detectGoodFeatures(query_img, new_candidate_corners, mask_mat);
+		corners2keypoint(new_candidate_corners, candidate_kp, 
 							query_id, M_current);
 
-		// query_corners.insert(query_corners.end(), new_query_corners.begin(), 
- 	    // 					new_query_corners.end());
+		candidate_corners.insert(candidate_corners.end(), new_candidate_corners.begin(), 
+ 	    					new_candidate_corners.end());
+
+
 
 		database_corners = query_corners;
-		new_database_corners = new_query_corners;
 		query_img.copyTo(database_img);
 		query_id++;
 	}
