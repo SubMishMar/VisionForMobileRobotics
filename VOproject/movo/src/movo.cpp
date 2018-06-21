@@ -291,11 +291,13 @@ void movo::continousOperation(uint frame_id,
 		
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
-		std::vector<uchar> status;
-		status = calculateOpticalFlow(database_img,  query_img,
+		std::vector<uchar> status1, status2;
+		// status1 = calculateOpticalFlow(database_img, query_img,
+		// 							  new_database_corners, new_query_corners);
+		// filterbyStatus(status1, new);
+		status2 = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
-		// filterbyStatus(status, query_corners, candidate_kp);
-		filterbyStatus(status, database_corners, query_corners/*, landmarks_3d*/);
+		filterbyStatus(status2, database_corners, query_corners/*, landmarks_3d*/);
 		
 		// std::vector<double> diff(candidate_kp.size());
 		// for(int i = 0; i < candidate_kp.size(); i++) {
@@ -312,22 +314,23 @@ void movo::continousOperation(uint frame_id,
 		std::cout << database_corners.size() << " " << query_corners.size() << " " 
 		/*<< candidate_kp.size() << */" " << query_id << std::endl;
 		
-		// cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
-		// cv::Mat mask_mat_color;
-		// cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-		// for(int i = 0; i < query_corners.size(); i++) {
-		// 	cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
-		// }
-		// cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+		cv::Mat mask_mat_color;
+		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+		for(int i = 0; i < query_corners.size(); i++) {
+			cv::circle(mask_mat_color, query_corners[i], 30, CV_RGB(0,0,0),-8,0);
+		}
+		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
 		
-		// detectGoodFeatures(query_img, new_query_corners, mask_mat);
-		// corners2keypoint(new_query_corners, candidate_kp, 
-		// 					query_id, M_current);
+		detectGoodFeatures(query_img, new_query_corners, mask_mat);
+		corners2keypoint(new_query_corners, candidate_kp, 
+							query_id, M_current);
 
 		// query_corners.insert(query_corners.end(), new_query_corners.begin(), 
- 	// 					new_query_corners.end());
+ 	    // 					new_query_corners.end());
 
 		database_corners = query_corners;
+		new_database_corners = new_query_corners;
 		query_img.copyTo(database_img);
 		query_id++;
 	}

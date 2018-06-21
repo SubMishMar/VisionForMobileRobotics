@@ -53,6 +53,7 @@ private:
     cv::Mat point3d_homo;
     std::vector<cv::Point3f> point3d_unhomo;
     std::vector<keypoint> candidate_kp;
+    std::vector<cv::Point2f> candidate_corners;
     //
     bool useFAST;
 
