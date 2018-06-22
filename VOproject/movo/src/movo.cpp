@@ -283,7 +283,7 @@ void movo::continousOperation(uint frame_id,
 	std::vector<cv::Point2f> query_corners;
 	std::vector<cv::Point2f> new_candidate_corners;
 	std::vector<cv::Point2f> candidate_corners_j;
-	cv::Mat M_previous = cv::Mat::eye(3, 4, CV_64FC1);
+
 	cv::Mat M_current = cv::Mat::eye(3, 4, CV_64FC1);
 	int count = 0;
 	bool new_triangulation = false;
@@ -301,7 +301,7 @@ void movo::continousOperation(uint frame_id,
 
 		status2 = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
-		filterbyStatus(status2, database_corners, query_corners/*, landmarks_3d*/);
+		filterbyStatus(status2, database_corners, query_corners, landmarks_3d);
 		
 		// std::vector<double> diff(candidate_kp.size());
 		// for(int i = 0; i < candidate_kp.size(); i++) {
@@ -309,12 +309,18 @@ void movo::continousOperation(uint frame_id,
 		// 	std::cout << abs((int)candidate_kp[i].id0 - (int)query_id) << std::endl;
 		// }
 
-		// std::vector<int> inliers;
-		// solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
-		// 			    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
-		// Rodrigues(rvec, Rpnp, cv::noArray());
+		std::vector<int> inliers;
+		solvePnPRansac(landmarks_3d, query_corners, K, cv::noArray(), rvec, tvec, 
+					    false, 100, 8, 0.99, inliers, cv::SOLVEPNP_P3P);
+		Rodrigues(rvec, Rpnp, cv::noArray());
 		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
+		R = Rpnp.inv();
+		t = -(Rpnp.inv())*tvec;
+		R.copyTo(M_current.rowRange(0, 3).colRange(0, 3));
+		t.copyTo(M_current.rowRange(0, 3).col(3));
+
 		drawmatches(database_img, query_img, database_corners, query_corners);
+
 		std::cout << database_corners.size() << " " << query_corners.size() << " " 
 		<< candidate_kp.size() << " " << candidate_corners.size() << std::endl;
 		
