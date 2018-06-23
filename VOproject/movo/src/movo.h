@@ -13,6 +13,12 @@
 // #include <pcl/point_types.h>
 // #include <pcl/point_cloud.h>
 // #include <pcl/visualization/pcl_visualizer.h>
+struct keypoint
+{
+	cv::Point2f pt;
+	uint id0;
+	cv::Mat M0;
+};
 
 class movo{
 private:
@@ -46,7 +52,8 @@ private:
     cv::Mat mask;
     cv::Mat point3d_homo;
     std::vector<cv::Point3f> point3d_unhomo;
-    
+    std::vector<keypoint> candidate_kp;
+    std::vector<cv::Point2f> candidate_corners;
     //
     bool useFAST;
 
@@ -101,9 +108,16 @@ public:
 					    std::vector<cv::Point2f> &corners2,
 					    std::vector<cv::Point3f> &landmarks);
 
-	void filterbyLmkZ( std::vector<cv::Point2f> &corners1,
-					    std::vector<cv::Point2f> &corners2,
-					    std::vector<cv::Point3f> &landmarks); 
+	void filterbyStatus(std::vector<uchar> status,
+						std::vector<cv::Point2f> corners,
+						std::vector<keypoint> &keypoints);
+
+	void filterbyStatus(cv::Mat mask,
+						std::vector<keypoint> &keypoints);
+
+	void filterbyLmkZ(std::vector<cv::Point2f> &corners1,
+					   std::vector<cv::Point2f> &corners2,
+					   std::vector<cv::Point3f> &landmarks); 
 					    //Filters points which result 
 						 //in negative Z in landmarks
 	//Drawmatches
@@ -123,4 +137,10 @@ public:
 
 	//Draw trajectory;
 	void drawTrajectory(cv::Mat, cv::Mat);
+
+	//
+	void corners2keypoint(std::vector<cv::Point2f> src,
+						  std::vector<keypoint> &dst,
+						  int,
+						  cv::Mat);
 };
