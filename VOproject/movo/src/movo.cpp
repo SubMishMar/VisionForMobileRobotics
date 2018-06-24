@@ -372,7 +372,8 @@ void movo::continousOperation(uint frame_id,
 		          << query_corners.size() << "\t"
 		          << candidate_corners.size() << "\t"
 		          << landmarks_3d.size() << std::endl;
-		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
+		          
+		std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
 		if(candidate_corners.size()>10) {
 			status1 = calculateOpticalFlow(database_img,  query_img,
 										  candidate_corners, candidate_corners_j);
