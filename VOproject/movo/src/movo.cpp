@@ -186,8 +186,14 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 	cv::waitKey(0);
 }
 
-void movo::drawTrajectory(cv::Mat R, cv::Mat t) {
-
+void movo::drawTrajectory(cv::Mat t, cv::Mat &traj) {
+    int x = int(t.at<double>(0)) + 750;
+	int y = int(t.at<double>(2)) + 750;
+	std::cout << x << "\t"
+			  << y << std::endl;
+	circle(traj, cv::Point(y, x), 1, CV_RGB(255, 0, 0), 2);
+	imshow( "Trajectory", traj);
+	cv::waitKey(30);
 }
 
 cv::Mat movo::vector2mat(cv::Point2f pt2d) {
@@ -347,13 +353,12 @@ void movo::continousOperation(uint frame_id,
 	
 	int count = 0;
 	bool new_triangulation = false;
+	cv::Mat traj = cv::Mat::zeros(1500, 1500, CV_8UC3);
 	while(query_id < filenames_left.size()) {
 		cv::Mat M_current = cv::Mat::eye(3, 4, CV_64FC1);
 		undistort(imread(filenames_left[query_id], CV_8UC1), 
 					query_img, K, cv::noArray(), K);
 		std::vector<uchar> status1, status2;
-
-
 		status2 = calculateOpticalFlow(database_img,  query_img,
 									  database_corners, query_corners);
 
@@ -367,13 +372,14 @@ void movo::continousOperation(uint frame_id,
 
 		Rpnp.copyTo(M_current.rowRange(0, 3).colRange(0, 3));
 		tvec.copyTo(M_current.rowRange(0, 3).col(3));
-
-		std::cout << database_corners.size() << "\t" 
-		          << query_corners.size() << "\t"
-		          << candidate_corners.size() << "\t"
-		          << landmarks_3d.size() << std::endl;
+		
+		// std::cout << database_corners.size() << "\t" 
+		//           << query_corners.size() << "\t"
+		//           << candidate_corners.size() << "\t"
+		//           << landmarks_3d.size() << std::endl;
 		          
-		std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
+		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
+		drawTrajectory((-Rpnp.inv()*tvec), traj);
 		if(candidate_corners.size()>10) {
 			status1 = calculateOpticalFlow(database_img,  query_img,
 										  candidate_corners, candidate_corners_j);

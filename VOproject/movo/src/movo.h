@@ -132,7 +132,7 @@ public:
 	cv::Mat vector2mat(cv::Point2f);
 
 	//Draw trajectory;
-	void drawTrajectory(cv::Mat, cv::Mat);
+	void drawTrajectory(cv::Mat t, cv::Mat &traj);
 
 	//
 	void corners2keypoint(std::vector<cv::Point2f> src,
