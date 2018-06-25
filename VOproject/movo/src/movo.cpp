@@ -189,8 +189,6 @@ void movo::drawmatches(cv::Mat img1, cv::Mat img2,
 void movo::drawTrajectory(cv::Mat t, cv::Mat &traj) {
     int x = int(t.at<double>(0)) + 750;
 	int y = int(t.at<double>(2)) + 750;
-	std::cout << x << "\t"
-			  << y << std::endl;
 	circle(traj, cv::Point(y, x), 1, CV_RGB(255, 0, 0), 2);
 	imshow( "Trajectory", traj);
 	cv::waitKey(30);
@@ -288,6 +286,34 @@ void movo::selectnewPts(std::vector<keypoint> &candidate_kp,
 	candidate_corners.clear();
 }
 
+void movo::drawLandmarks(std::vector<cv::Point3f> landmarks) {
+	pcl::visualization::PCLVisualizer viewer("Viewer");
+	viewer.setBackgroundColor (255, 255, 255);
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+	cloud->points.resize(landmarks.size());
+
+
+	for(int i = 0; i < landmarks.size(); i++) {
+	    pcl::PointXYZRGB &point = cloud->points[i];
+	    point.x = landmarks[i].x;
+	    point.y = landmarks[i].y;
+	    point.z = landmarks[i].z;
+	    point.r = 0;
+	    point.g = 0;
+	    point.b = 255;
+	}
+  	viewer.addPointCloud(cloud, "Triangulated Point Cloud");
+  	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
+                                            3,
+											"Triangulated Point Cloud");
+  	viewer.addCoordinateSystem (1.0);
+
+  	viewer.initCameraParameters ();
+  	while (!viewer.wasStopped ()) {
+    viewer.spin();
+	}
+}
+
 void movo::initialize(uint frame1, uint frame2) {
 	cv::Mat point3d_homo;
     std::vector<cv::Point3f> point3d_unhomo;
@@ -363,6 +389,7 @@ void movo::continousOperation(uint frame_id,
 									  database_corners, query_corners);
 
 		filterbyStatus(status2, database_corners, query_corners, landmarks_3d);
+
 		drawmatches(database_img, query_img, database_corners, query_corners);
 
 		std::vector<int> inliers;
@@ -373,12 +400,12 @@ void movo::continousOperation(uint frame_id,
 		Rpnp.copyTo(M_current.rowRange(0, 3).colRange(0, 3));
 		tvec.copyTo(M_current.rowRange(0, 3).col(3));
 		
-		// std::cout << database_corners.size() << "\t" 
-		//           << query_corners.size() << "\t"
-		//           << candidate_corners.size() << "\t"
-		//           << landmarks_3d.size() << std::endl;
+		std::cout << database_corners.size() << "\t" 
+		          << query_corners.size() << "\t"
+		          << candidate_corners.size() << "\t"
+		          << landmarks_3d.size() << std::endl;
 		          
-		//std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
+		std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
 		drawTrajectory((-Rpnp.inv()*tvec), traj);
 		if(candidate_corners.size()>10) {
 			status1 = calculateOpticalFlow(database_img,  query_img,
@@ -394,6 +421,7 @@ void movo::continousOperation(uint frame_id,
 							new_landmarks_3d.end());
 		}	
 
+		drawLandmarks(landmarks_3d);
 		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
 		cv::Mat mask_mat_color;
 		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);

@@ -8,11 +8,12 @@
 #include <opencv2/core/eigen.hpp>
 
 
-// #include <pcl/common/common_headers.h>
-// #include <pcl/io/pcd_io.h>
-// #include <pcl/point_types.h>
-// #include <pcl/point_cloud.h>
-// #include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/common/common_headers.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/visualization/pcl_visualizer.h>
+
 struct keypoint
 {
 	cv::Point2f pt;
@@ -146,4 +147,6 @@ public:
 					  cv::Mat M_current,
 					  std::vector<cv::Point2f> &new_query_corners,
 					  std::vector<cv::Point3f> &new_landmarks_3d);
+
+	void drawLandmarks(std::vector<cv::Point3f> landmarks);
 };
