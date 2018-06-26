@@ -9,9 +9,11 @@
 
 
 #include <pcl/common/common_headers.h>
+#include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
 struct keypoint
@@ -56,6 +58,9 @@ private:
 
     // pose
     cv::Mat R, t, Rpnp;
+
+    // pcl
+    pcl::visualization::PCLVisualizer viewer;
 public:
 	//construtor
 	movo(int, char**);

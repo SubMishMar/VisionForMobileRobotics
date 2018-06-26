@@ -287,7 +287,8 @@ void movo::selectnewPts(std::vector<keypoint> &candidate_kp,
 }
 
 void movo::drawLandmarks(std::vector<cv::Point3f> landmarks) {
-	pcl::visualization::PCLVisualizer viewer("Viewer");
+  	viewer.removeAllShapes();
+    viewer.removeAllPointClouds();
 	viewer.setBackgroundColor (255, 255, 255);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 	cloud->points.resize(landmarks.size());
@@ -307,11 +308,8 @@ void movo::drawLandmarks(std::vector<cv::Point3f> landmarks) {
                                             3,
 											"Triangulated Point Cloud");
   	viewer.addCoordinateSystem (1.0);
-
-  	viewer.initCameraParameters ();
-  	while (!viewer.wasStopped ()) {
-    viewer.spin();
-	}
+  	//viewer.setCameraPosition(0,0,0,-1,0,0,0,0,0);
+  	viewer.spinOnce(100);
 }
 
 void movo::initialize(uint frame1, uint frame2) {
@@ -406,47 +404,47 @@ void movo::continousOperation(uint frame_id,
 		          << landmarks_3d.size() << std::endl;
 		          
 		std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
-		drawTrajectory((-Rpnp.inv()*tvec), traj);
-		if(candidate_corners.size()>10) {
-			status1 = calculateOpticalFlow(database_img,  query_img,
-										  candidate_corners, candidate_corners_j);
-			filterbyStatus(status1, candidate_corners_j, candidate_kp);		
-			filterbyStatus(status1, candidate_corners, candidate_corners_j);
-			candidate_corners = candidate_corners_j;
-			selectnewPts(candidate_kp, candidate_corners, query_id, M_current, 
-						new_query_corners, new_landmarks_3d);
-			query_corners.insert(query_corners.end(), new_query_corners.begin(), 
- 	    							new_query_corners.end());
-			landmarks_3d.insert(landmarks_3d.end(), new_landmarks_3d.begin(), 
-							new_landmarks_3d.end());
-		}	
+		//drawTrajectory((-Rpnp.inv()*tvec), traj);
+		// if(candidate_corners.size()>10) {
+		// 	status1 = calculateOpticalFlow(database_img,  query_img,
+		// 								  candidate_corners, candidate_corners_j);
+		// 	filterbyStatus(status1, candidate_corners_j, candidate_kp);		
+		// 	filterbyStatus(status1, candidate_corners, candidate_corners_j);
+		// 	candidate_corners = candidate_corners_j;
+		// 	selectnewPts(candidate_kp, candidate_corners, query_id, M_current, 
+		// 				new_query_corners, new_landmarks_3d);
+		// 	query_corners.insert(query_corners.end(), new_query_corners.begin(), 
+ 	//     							new_query_corners.end());
+		// 	landmarks_3d.insert(landmarks_3d.end(), new_landmarks_3d.begin(), 
+		// 					new_landmarks_3d.end());
+		// }	
 
 		drawLandmarks(landmarks_3d);
-		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
-		cv::Mat mask_mat_color;
-		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-		std::vector<cv::Point2f> queryPlusCandidateCorners(query_corners.size()
-										+candidate_corners.size());
+		// cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+		// cv::Mat mask_mat_color;
+		// cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+		// std::vector<cv::Point2f> queryPlusCandidateCorners(query_corners.size()
+		// 								+candidate_corners.size());
 
 
-		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
-								query_corners.begin(), query_corners.end());
-		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
-								candidate_corners.begin(), candidate_corners.end());
+		// queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+		// 						query_corners.begin(), query_corners.end());
+		// queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+		// 						candidate_corners.begin(), candidate_corners.end());
 
-		for(int i = 0; i < queryPlusCandidateCorners.size(); i++) {
-			cv::circle(mask_mat_color, queryPlusCandidateCorners[i], 
-				15, CV_RGB(0,0,0), -8, 0);
-		}
-		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+		// for(int i = 0; i < queryPlusCandidateCorners.size(); i++) {
+		// 	cv::circle(mask_mat_color, queryPlusCandidateCorners[i], 
+		// 		15, CV_RGB(0,0,0), -8, 0);
+		// }
+		// cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
 		
-		detectGoodFeatures(query_img, new_candidate_corners, mask_mat);
+		// detectGoodFeatures(query_img, new_candidate_corners, mask_mat);
        
-		corners2keypoint(new_candidate_corners, candidate_kp, 
-							query_id, M_current);
+		// corners2keypoint(new_candidate_corners, candidate_kp, 
+		// 					query_id, M_current);
 
-		candidate_corners.insert(candidate_corners.end(), new_candidate_corners.begin(), 
- 	    					new_candidate_corners.end());
+		// candidate_corners.insert(candidate_corners.end(), new_candidate_corners.begin(), 
+ 	//     					new_candidate_corners.end());
 
 
 		database_corners = query_corners;
