@@ -63,7 +63,11 @@ private:
     pcl::visualization::PCLVisualizer viewer;
 public:
 	//construtor
-	movo(int, char**);
+	movo(int argc, char **argv) {
+		readParams(argc, argv);
+		K = P_L(cv::Range(0,3), cv::Range(0, 3));
+		useFAST = false;
+	}
 
 	//reads Params related to all functionalities
 	void readParams(int, char**);
