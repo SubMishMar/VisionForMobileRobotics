@@ -9,7 +9,7 @@ add_definitions(${PCL_DEFINITIONS})
 add_executable( movo src/movo.cpp 
 		     src/filters.cpp 
 		     src/drawers.cpp 
-		     src/vec2mat2vec.cpp
+		     src/conversions.cpp
 		     src/paramreader.cpp
 		     src/featureDetectionAndTracking.cpp 
 		     src/init.cpp )

@@ -15,32 +15,6 @@ cv::Mat movo::epipolarSearch(std::vector<cv::Point2f> corners1,
 	return mask;
 }
 
-void movo::convertFromHomogeneous(cv::Mat p3h, std::vector<cv::Point3f> &p3uh) {
-	p3uh.clear();
-	for(int i = 0; i < p3h.cols; i++) {
-	  cv::Mat p3d_col_i;
-	  cv::Mat p3h_col_i = p3h.col(i);
-	  convertPointsFromHomogeneous(p3h_col_i.t(), p3d_col_i);
-	  float x = (float)p3d_col_i.at<double>(0);
-	  float y = (float)p3d_col_i.at<double>(1);
-	  float z = (float)p3d_col_i.at<double>(2);
-	  p3uh.push_back(cv::Point3f(x, y, z));
-	}
-}
-
-void movo::corners2keypoint(std::vector<cv::Point2f> corners,
-					  std::vector<keypoint> &keypoints,
-					  int frame,
-					  cv::Mat M) {
-	for(int i = 0; i < corners.size(); i++) {
-		keypoint kpt;
-		kpt.pt = corners[i];
-		kpt.id0 = frame;
-		kpt.M0 = M;
-		keypoints.push_back(kpt); 
-	}
-}
-
 void movo::selectnewPts(std::vector<keypoint> &candidate_kp, 
 						std::vector<cv::Point2f> &candidate_corners,
 						int query_id,
