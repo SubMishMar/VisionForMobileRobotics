@@ -86,114 +86,6 @@ cv::Mat movo::epipolarSearch(std::vector<cv::Point2f> corners1,
 	return mask;
 }
 
-void movo::filterbyMask(cv::Mat mask,
-					    std::vector<cv::Point2f> &corners1,
-					    std::vector<cv::Point2f> &corners2) {
-	int j = 0;
-	for(int i = 0; i < corners1.size(); i++) {
-		if(!mask.at<unsigned char>(i)) {
-			continue;
-		}
-		corners1[j] = corners1[i];
-		corners2[j] = corners2[i];
-		j++;
-	}
-	corners1.resize(j);
-	corners2.resize(j);	
-}
-
-void movo::filterbyMask(cv::Mat mask,
-					    std::vector<cv::Point2f> &corners1,
-					    std::vector<cv::Point2f> &corners2,
-					    std::vector<cv::Point3f> &landmarks) {
-	int j = 0;
-	for(int i = 0; i < corners1.size(); i++) {
-		if(!mask.at<unsigned char>(i)) {
-			continue;
-		}
-		corners1[j] = corners1[i];
-		corners2[j] = corners2[i];
-		landmarks[j] = landmarks[i];
-		j++;
-	}
-	corners1.resize(j);
-	corners2.resize(j);	
-	landmarks.resize(j);
-}
-
-void movo::filterbyStatus(std::vector<uchar> status,
-					      std::vector<cv::Point2f> &corners1,
-					      std::vector<cv::Point2f> &corners2) {
-	int j = 0;
-	for(int i = 0; i < status.size(); i++) {
-		if(status[i] == 0 ||
-		   corners2[i].x < 0 || corners2[i].y < 0 ||
-		   corners2[i].x > img1.cols || corners2[i].y > img1.rows) continue;
-		corners1[j] = corners1[i];
-		corners2[j] = corners2[i];
-		j++;
-	}
-	corners1.resize(j);
-	corners2.resize(j);	
-}
-
-void movo::filterbyStatus(std::vector<uchar> status,
-					      std::vector<cv::Point2f> &corners1,
-					      std::vector<cv::Point2f> &corners2,
-					      std::vector<cv::Point3f> &landmarks) {
-	int j = 0;
-	for(int i = 0; i < status.size(); i++) {
-		if(status[i] == 0 ||
-		   corners2[i].x < 0 || corners2[i].y < 0 ||
-		   corners2[i].x > img1.cols || corners2[i].y > img1.rows) continue;
-		corners1[j] = corners1[i];
-		corners2[j] = corners2[i];
-		landmarks[j] = landmarks[i];
-		j++;
-	}
-	corners1.resize(j);
-	corners2.resize(j);	
-	landmarks.resize(j);
-}
-
-void movo::filterbyStatus(std::vector<uchar> status,
-					std::vector<cv::Point2f> corners,
-					std::vector<keypoint> &keypoints) {
-	int j = 0;
-	for(int i = 0; i < status.size(); i++) {
-		if(status[i] == 0 ||
-		   corners[i].x < 0 || corners[i].y < 0 ||
-		   corners[i].x > img1.cols || corners[i].y > img1.rows) continue;
-		keypoints[j] = keypoints[i];
-		j++;
-	}
-	keypoints.resize(j);
-}
-
-void movo::drawmatches(cv::Mat img1, cv::Mat img2, 
-				   	   std::vector<cv::Point2f> corners1,
-					   std::vector<cv::Point2f> corners2) {
-	
-	cv::cvtColor(img1, img1_out, CV_GRAY2BGR);
-	cv::cvtColor(img2, img2_out, CV_GRAY2BGR);
-	for(int l = 0; l < corners1.size(); l++){
-		cv::circle(img1_out, corners1[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
-		cv::circle(img2_out, corners2[l], 4, CV_RGB(255, 0, 0), -1, 8, 0);
-	}	
-	imshow("img1", img1_out);
-	cv::waitKey(0);
-	imshow("img2", img2_out);
-	cv::waitKey(0);
-}
-
-void movo::drawTrajectory(cv::Mat t, cv::Mat &traj) {
-    int x = int(t.at<double>(0)) + 750;
-	int y = int(t.at<double>(2)) + 750;
-	circle(traj, cv::Point(y, x), 1, CV_RGB(255, 0, 0), 2);
-	imshow( "Trajectory", traj);
-	cv::waitKey(30);
-}
-
 cv::Mat movo::vector2mat(cv::Point2f pt2d) {
 	cv::Mat pt2d_mat=cv::Mat::zeros(2, 1, CV_64FC1);
 	pt2d_mat.at<double>(0) = pt2d.x;
@@ -284,34 +176,6 @@ void movo::selectnewPts(std::vector<keypoint> &candidate_kp,
 
 	candidate_kp.clear();
 	candidate_corners.clear();
-}
-
-void movo::drawLandmarks(std::vector<cv::Point3f> landmarks) {
-	pcl::visualization::PCLVisualizer viewer("Viewer");
-	viewer.setBackgroundColor (255, 255, 255);
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-	cloud->points.resize(landmarks.size());
-
-
-	for(int i = 0; i < landmarks.size(); i++) {
-	    pcl::PointXYZRGB &point = cloud->points[i];
-	    point.x = landmarks[i].x;
-	    point.y = landmarks[i].y;
-	    point.z = landmarks[i].z;
-	    point.r = 0;
-	    point.g = 0;
-	    point.b = 255;
-	}
-  	viewer.addPointCloud(cloud, "Triangulated Point Cloud");
-  	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
-                                            3,
-											"Triangulated Point Cloud");
-  	viewer.addCoordinateSystem (1.0);
-
-  	viewer.initCameraParameters ();
-  	while (!viewer.wasStopped ()) {
-    viewer.spin();
-	}
 }
 
 void movo::initialize(uint frame1, uint frame2) {
@@ -406,47 +270,47 @@ void movo::continousOperation(uint frame_id,
 		          << landmarks_3d.size() << std::endl;
 		          
 		std::cout << (-Rpnp.inv()*tvec).t() << std::endl;
-		drawTrajectory((-Rpnp.inv()*tvec), traj);
-		if(candidate_corners.size()>10) {
-			status1 = calculateOpticalFlow(database_img,  query_img,
-										  candidate_corners, candidate_corners_j);
-			filterbyStatus(status1, candidate_corners_j, candidate_kp);		
-			filterbyStatus(status1, candidate_corners, candidate_corners_j);
-			candidate_corners = candidate_corners_j;
-			selectnewPts(candidate_kp, candidate_corners, query_id, M_current, 
-						new_query_corners, new_landmarks_3d);
-			query_corners.insert(query_corners.end(), new_query_corners.begin(), 
- 	    							new_query_corners.end());
-			landmarks_3d.insert(landmarks_3d.end(), new_landmarks_3d.begin(), 
-							new_landmarks_3d.end());
-		}	
+		//drawTrajectory((-Rpnp.inv()*tvec), traj);
+		// if(candidate_corners.size()>10) {
+		// 	status1 = calculateOpticalFlow(database_img,  query_img,
+		// 								  candidate_corners, candidate_corners_j);
+		// 	filterbyStatus(status1, candidate_corners_j, candidate_kp);		
+		// 	filterbyStatus(status1, candidate_corners, candidate_corners_j);
+		// 	candidate_corners = candidate_corners_j;
+		// 	selectnewPts(candidate_kp, candidate_corners, query_id, M_current, 
+		// 				new_query_corners, new_landmarks_3d);
+		// 	query_corners.insert(query_corners.end(), new_query_corners.begin(), 
+ 	//     							new_query_corners.end());
+		// 	landmarks_3d.insert(landmarks_3d.end(), new_landmarks_3d.begin(), 
+		// 					new_landmarks_3d.end());
+		// }	
 
 		drawLandmarks(landmarks_3d);
-		cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
-		cv::Mat mask_mat_color;
-		cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
-		std::vector<cv::Point2f> queryPlusCandidateCorners(query_corners.size()
-										+candidate_corners.size());
+		// cv::Mat mask_mat(query_img.size(), CV_8UC1, cv::Scalar::all(255));
+		// cv::Mat mask_mat_color;
+		// cv::cvtColor(mask_mat, mask_mat_color, CV_GRAY2BGR);
+		// std::vector<cv::Point2f> queryPlusCandidateCorners(query_corners.size()
+		// 								+candidate_corners.size());
 
 
-		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
-								query_corners.begin(), query_corners.end());
-		queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
-								candidate_corners.begin(), candidate_corners.end());
+		// queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+		// 						query_corners.begin(), query_corners.end());
+		// queryPlusCandidateCorners.insert(queryPlusCandidateCorners.end(),
+		// 						candidate_corners.begin(), candidate_corners.end());
 
-		for(int i = 0; i < queryPlusCandidateCorners.size(); i++) {
-			cv::circle(mask_mat_color, queryPlusCandidateCorners[i], 
-				15, CV_RGB(0,0,0), -8, 0);
-		}
-		cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
+		// for(int i = 0; i < queryPlusCandidateCorners.size(); i++) {
+		// 	cv::circle(mask_mat_color, queryPlusCandidateCorners[i], 
+		// 		15, CV_RGB(0,0,0), -8, 0);
+		// }
+		// cv::cvtColor(mask_mat_color, mask_mat, CV_BGR2GRAY);
 		
-		detectGoodFeatures(query_img, new_candidate_corners, mask_mat);
+		// detectGoodFeatures(query_img, new_candidate_corners, mask_mat);
        
-		corners2keypoint(new_candidate_corners, candidate_kp, 
-							query_id, M_current);
+		// corners2keypoint(new_candidate_corners, candidate_kp, 
+		// 					query_id, M_current);
 
-		candidate_corners.insert(candidate_corners.end(), new_candidate_corners.begin(), 
- 	    					new_candidate_corners.end());
+		// candidate_corners.insert(candidate_corners.end(), new_candidate_corners.begin(), 
+ 	//     					new_candidate_corners.end());
 
 
 		database_corners = query_corners;

@@ -6,7 +6,7 @@ find_package(PCL REQUIRED COMPONENTS common io visualization)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
-add_executable( movo src/movo.cpp src/init.cpp )
+add_executable( movo src/movo.cpp src/filters.cpp src/drawers.cpp src/init.cpp )
 target_link_libraries(movo ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} 
 					   ${PCL_VISUALIZATION_LIBRARIES}
 					   )
